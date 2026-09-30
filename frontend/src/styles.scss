@@ -1,0 +1,21 @@
+/* Global styles. Bootstrap is included via angular.json "styles". */
+body {
+  background-color: #f5f7fb;
+}
+
+.credit-card {
+  border-radius: 1rem;
+  color: #fff;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  min-height: 190px;
+}
+
+.credit-card.blocked {
+  background: linear-gradient(135deg, #6c757d, #495057);
+}
+
+.card-number {
+  font-family: 'Courier New', monospace;
+  font-size: 1.3rem;
+  letter-spacing: 2px;
+}

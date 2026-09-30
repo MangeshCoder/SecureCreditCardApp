@@ -1,0 +1,52 @@
+<h1 class="h3 mb-4">All cards</h1>
+
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+<div class="table-responsive">
+  <table class="table table-hover bg-white shadow-sm align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Card</th><th>Cardholder</th><th>Number</th><th class="text-end">Limit</th><th class="text-end">Available</th>
+        <th>Expiry</th><th>Status</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (card of cards(); track card.cardId) {
+        <tr>
+          <td>{{ card.cardId }}</td>
+          <td>{{ card.cardholderId }}</td>
+          <td class="font-monospace">{{ card.maskedCardNumber }}</td>
+          <td class="text-end">
+            @if (editingLimit() === card.cardId) {
+              <input type="number" class="form-control form-control-sm d-inline-block w-auto" [(ngModel)]="newLimit" min="1">
+            } @else {
+              {{ card.creditLimit | currency: currency }}
+            }
+          </td>
+          <td class="text-end">{{ card.availableBalance | currency: currency }}</td>
+          <td>{{ card.expiryDate | date: 'MM/yy' }}</td>
+          <td>
+            <span class="badge" [class]="card.cardStatus === 'Active' ? 'bg-success' : 'bg-danger'">{{ card.cardStatus }}</span>
+          </td>
+          <td class="text-end text-nowrap">
+            @if (editingLimit() === card.cardId) {
+              <button class="btn btn-sm btn-primary me-1" (click)="saveLimit(card)">Save</button>
+              <button class="btn btn-sm btn-link" (click)="editingLimit.set(null)">Cancel</button>
+            } @else {
+              <button class="btn btn-sm btn-outline-primary me-1" (click)="editLimit(card)">Change limit</button>
+              @if (card.cardStatus === 'Active') {
+                <button class="btn btn-sm btn-outline-danger" (click)="block(card)">Block</button>
+              } @else {
+                <button class="btn btn-sm btn-outline-success" (click)="activate(card)">Unblock</button>
+              }
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="8" class="text-center text-muted">No cards issued yet.</td></tr>
+      }
+    </tbody>
+  </table>
+</div>

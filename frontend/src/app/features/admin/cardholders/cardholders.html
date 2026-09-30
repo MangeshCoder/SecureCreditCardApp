@@ -1,0 +1,76 @@
+<h1 class="h3 mb-4">Cardholders</h1>
+
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+@if (issued(); as r) {
+  <div class="alert alert-warning">
+    <h2 class="h5">Card issued – shown only once</h2>
+    <p class="mb-2">Hand these details to the customer securely. They cannot be retrieved again (CVV and PIN are stored only as hashes).</p>
+    <dl class="row mb-2 font-monospace">
+      <dt class="col-sm-3">Card number</dt><dd class="col-sm-9">{{ r.cardNumber }}</dd>
+      <dt class="col-sm-3">CVV</dt><dd class="col-sm-9">{{ r.cvv }}</dd>
+      <dt class="col-sm-3">Initial PIN</dt><dd class="col-sm-9">{{ r.initialPin }}</dd>
+      <dt class="col-sm-3">Expiry</dt><dd class="col-sm-9">{{ r.card.expiryDate | date: 'MM/yy' }}</dd>
+      <dt class="col-sm-3">Credit limit</dt><dd class="col-sm-9">{{ r.card.creditLimit | currency: currency }}</dd>
+    </dl>
+    <button class="btn btn-sm btn-dark" (click)="issued.set(null)">I have recorded these details</button>
+  </div>
+}
+
+@if (issuingFor(); as c) {
+  <div class="card mb-4 shadow-sm">
+    <div class="card-body">
+      <h2 class="h5">Issue a card to {{ c.firstName }} {{ c.lastName }}</h2>
+      <form class="row g-2 align-items-end" [formGroup]="issueForm" (ngSubmit)="issue()" novalidate>
+        <div class="col-sm-4">
+          <label class="form-label" for="limit">Credit limit ({{ currency }})</label>
+          <input id="limit" type="number" class="form-control" formControlName="creditLimit"
+                 [class.is-invalid]="issueForm.controls.creditLimit.touched && issueForm.controls.creditLimit.invalid">
+          <div class="invalid-feedback">Between 1 and 1,000,000.</div>
+        </div>
+        <div class="col-sm-8 d-flex gap-2">
+          <button class="btn btn-primary" type="submit">Issue card</button>
+          <button class="btn btn-link" type="button" (click)="issuingFor.set(null)">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<div class="table-responsive">
+  <table class="table table-hover bg-white shadow-sm align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Cards</th><th>Joined</th><th>Status</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (c of cardholders(); track c.cardholderId) {
+        <tr>
+          <td>{{ c.cardholderId }}</td>
+          <td>{{ c.firstName }} {{ c.lastName }}</td>
+          <td>{{ c.email }}</td>
+          <td>{{ c.phoneNumber }}</td>
+          <td>{{ c.role }}</td>
+          <td>{{ c.cardCount }}</td>
+          <td>{{ c.createdAt | date: 'mediumDate' }}</td>
+          <td>
+            <span class="badge" [class]="c.isActive ? 'bg-success' : 'bg-secondary'">{{ c.isActive ? 'Active' : 'Inactive' }}</span>
+          </td>
+          <td class="text-end text-nowrap">
+            @if (c.role === 'Cardholder') {
+              <button class="btn btn-sm btn-primary me-1" [disabled]="!c.isActive" (click)="startIssue(c)">Issue card</button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="toggleActive(c)">
+                {{ c.isActive ? 'Deactivate' : 'Activate' }}
+              </button>
+            }
+          </td>
+        </tr>
+      } @empty {
+        <tr><td colspan="9" class="text-center text-muted">No cardholders yet.</td></tr>
+      }
+    </tbody>
+  </table>
+</div>

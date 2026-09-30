@@ -1,0 +1,30 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using SecureEmiCard.Domain.Entities;
+
+namespace SecureEmiCard.Infrastructure.Persistence.Configurations;
+
+public class CreditCardConfiguration : IEntityTypeConfiguration<CreditCard>
+{
+    public void Configure(EntityTypeBuilder<CreditCard> b)
+    {
+        b.ToTable("CreditCards");
+        b.HasKey(x => x.CardId);
+        b.Property(x => x.CardId).ValueGeneratedOnAdd();
+
+        b.Property(x => x.CardNumberEncrypted).HasMaxLength(512).IsRequired();
+        b.Property(x => x.MaskedCardNumber).HasMaxLength(20).IsRequired();
+        b.Property(x => x.CvvHash).HasMaxLength(256).IsRequired();
+        b.Property(x => x.PinHash).HasMaxLength(256).IsRequired();
+        b.Property(x => x.CreditLimit).HasPrecision(18, 2);
+        b.Property(x => x.AvailableBalance).HasPrecision(18, 2);
+        b.Property(x => x.CardStatus).HasConversion<string>().HasMaxLength(20).IsRequired();
+        b.Property(x => x.ExpiryDate).HasColumnType("date");
+        b.Property(x => x.CreatedAt).HasColumnType("datetime2");
+
+        b.HasIndex(x => x.CardholderId).HasDatabaseName("IX_CreditCards_CardholderId");
+
+        b.Ignore(x => x.OutstandingAmount);
+        b.Ignore(x => x.IsExpired);
+    }
+}

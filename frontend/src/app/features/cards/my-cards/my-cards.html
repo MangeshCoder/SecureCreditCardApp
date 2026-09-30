@@ -1,0 +1,103 @@
+<h1 class="h3 mb-4">My cards</h1>
+
+@if (message()) {
+  <div class="alert alert-success alert-dismissible">
+    {{ message() }}
+    <button type="button" class="btn-close" (click)="message.set(null)"></button>
+  </div>
+}
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+@if (loading()) {
+  <p class="text-muted">Loading…</p>
+} @else if (cards().length === 0) {
+  <div class="alert alert-info">
+    You don't have any cards yet. Once the bank approves your application, your card will appear here.
+  </div>
+}
+
+<div class="row g-4">
+  @for (card of cards(); track card.cardId) {
+    <div class="col-lg-6">
+      <div class="credit-card p-4 shadow" [class.blocked]="card.cardStatus === 'Blocked'">
+        <div class="d-flex justify-content-between">
+          <span class="fw-semibold">Secure Credit EMI</span>
+          <span class="badge" [class]="card.cardStatus === 'Active' ? 'bg-success' : 'bg-danger'">{{ card.cardStatus }}</span>
+        </div>
+        <div class="card-number my-4">
+          {{ revealed()?.cardId === card.cardId ? revealed()!.number : card.maskedCardNumber }}
+        </div>
+        <div class="d-flex justify-content-between small">
+          <span>Valid thru {{ card.expiryDate | date: 'MM/yy' }}</span>
+          <span>Card #{{ card.cardId }}</span>
+        </div>
+      </div>
+
+      <div class="card mt-2 shadow-sm">
+        <div class="card-body">
+          <div class="row text-center mb-3">
+            <div class="col">
+              <div class="small text-muted">Credit limit</div>
+              <div class="fw-semibold">{{ card.creditLimit | currency: currency }}</div>
+            </div>
+            <div class="col">
+              <div class="small text-muted">Available</div>
+              <div class="fw-semibold text-success">{{ card.availableBalance | currency: currency }}</div>
+            </div>
+            <div class="col">
+              <div class="small text-muted">Outstanding</div>
+              <div class="fw-semibold text-danger">{{ card.outstandingAmount | currency: currency }}</div>
+            </div>
+          </div>
+
+          @if (card.cardStatus === 'Active') {
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-outline-primary btn-sm" (click)="open(card.cardId, 'reveal')">Show card number</button>
+              <button class="btn btn-outline-secondary btn-sm" (click)="open(card.cardId, 'pin')">Change PIN</button>
+              <button class="btn btn-outline-danger btn-sm ms-auto" (click)="block(card)">Block card</button>
+            </div>
+          } @else {
+            <p class="text-muted small mb-0">This card is blocked. Contact the bank to unblock it.</p>
+          }
+
+          @if (panel()?.cardId === card.cardId && panel()?.kind === 'pin') {
+            <form class="row g-2 mt-3" [formGroup]="pinForm" (ngSubmit)="changePin(card.cardId)" novalidate>
+              <div class="col-sm-4">
+                <input class="form-control" type="password" inputmode="numeric" maxlength="4" placeholder="Current PIN"
+                       formControlName="currentPin" autocomplete="off"
+                       [class.is-invalid]="pinForm.controls.currentPin.touched && pinForm.controls.currentPin.invalid">
+              </div>
+              <div class="col-sm-4">
+                <input class="form-control" type="password" inputmode="numeric" maxlength="4" placeholder="New PIN"
+                       formControlName="newPin" autocomplete="off"
+                       [class.is-invalid]="pinForm.controls.newPin.touched && pinForm.controls.newPin.invalid">
+              </div>
+              <div class="col-sm-4 d-flex gap-2">
+                <button class="btn btn-primary btn-sm" type="submit">Save</button>
+                <button class="btn btn-link btn-sm" type="button" (click)="close()">Cancel</button>
+              </div>
+              <div class="form-text">4 digits. Avoid easy PINs such as 1111 or 1234.</div>
+            </form>
+          }
+
+          @if (panel()?.cardId === card.cardId && panel()?.kind === 'reveal') {
+            <form class="row g-2 mt-3" [formGroup]="revealForm" (ngSubmit)="reveal(card.cardId)" novalidate>
+              <div class="col-sm-5">
+                <input class="form-control" type="password" inputmode="numeric" maxlength="4" placeholder="Enter PIN"
+                       formControlName="pin" autocomplete="off"
+                       [class.is-invalid]="revealForm.controls.pin.touched && revealForm.controls.pin.invalid">
+              </div>
+              <div class="col-sm-7 d-flex gap-2">
+                <button class="btn btn-primary btn-sm" type="submit">Verify PIN</button>
+                <button class="btn btn-link btn-sm" type="button" (click)="close()">Cancel</button>
+              </div>
+              <div class="form-text">The full number is shown for 30 seconds.</div>
+            </form>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>
