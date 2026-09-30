@@ -7,9 +7,11 @@
         @if (auth.isAdmin()) {
           <li class="nav-item"><a class="nav-link" routerLink="/admin/cardholders" routerLinkActive="active">Cardholders</a></li>
           <li class="nav-item"><a class="nav-link" routerLink="/admin/cards" routerLinkActive="active">All cards</a></li>
+          <li class="nav-item"><a class="nav-link" routerLink="/admin/transactions" routerLinkActive="active">Transactions</a></li>
         } @else {
-          <li class="nav-item"><a class="nav-link" routerLink="/cards" routerLinkActive="active">My cards</a></li>
+          <li class="nav-item"><a class="nav-link" routerLink="/cards" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">My cards</a></li>
         }
+        <li class="nav-item"><a class="nav-link" routerLink="/pay" routerLinkActive="active">Checkout simulator</a></li>
       </ul>
       <span class="navbar-text text-white me-3">
         {{ auth.currentUser()?.fullName }}

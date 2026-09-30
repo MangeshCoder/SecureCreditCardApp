@@ -13,11 +13,20 @@ public class CreditCardConfiguration : IEntityTypeConfiguration<CreditCard>
         b.Property(x => x.CardId).ValueGeneratedOnAdd();
 
         b.Property(x => x.CardNumberEncrypted).HasMaxLength(512).IsRequired();
+        b.Property(x => x.CardNumberHash).HasMaxLength(64);
+        b.HasIndex(x => x.CardNumberHash)
+         .IsUnique()
+         .HasFilter("[CardNumberHash] IS NOT NULL")
+         .HasDatabaseName("UX_CreditCards_CardNumberHash");
         b.Property(x => x.MaskedCardNumber).HasMaxLength(20).IsRequired();
         b.Property(x => x.CvvHash).HasMaxLength(256).IsRequired();
         b.Property(x => x.PinHash).HasMaxLength(256).IsRequired();
         b.Property(x => x.CreditLimit).HasPrecision(18, 2);
-        b.Property(x => x.AvailableBalance).HasPrecision(18, 2);
+        // Optimistic concurrency: EF adds "WHERE AvailableBalance = <value we read>" to every UPDATE.
+        // If another request changed the balance in between, 0 rows are updated and EF throws,
+        // so two simultaneous swipes can never both spend the same money.
+        b.Property(x => x.AvailableBalance).HasPrecision(18, 2).IsConcurrencyToken();
+        b.Property(x => x.FailedPinAttempts);
         b.Property(x => x.CardStatus).HasConversion<string>().HasMaxLength(20).IsRequired();
         b.Property(x => x.ExpiryDate).HasColumnType("date");
         b.Property(x => x.CreatedAt).HasColumnType("datetime2");
@@ -26,5 +35,7 @@ public class CreditCardConfiguration : IEntityTypeConfiguration<CreditCard>
 
         b.Ignore(x => x.OutstandingAmount);
         b.Ignore(x => x.IsExpired);
+        b.Ignore(x => x.IsActive);
+        b.Ignore(x => x.RemainingPinAttempts);
     }
 }

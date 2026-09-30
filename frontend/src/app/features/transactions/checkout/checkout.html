@@ -1,0 +1,94 @@
+<h1 class="h3 mb-1">Checkout simulator</h1>
+<p class="text-muted mb-4">Acts like a shop's card terminal: it sends the purchase to the bank for authorization.</p>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        @for (e of errors(); track e) {
+          <div class="alert alert-danger py-2">{{ e }}</div>
+        }
+
+        <form [formGroup]="form" (ngSubmit)="pay()" novalidate autocomplete="off">
+          <h2 class="h6 text-uppercase text-muted">Merchant</h2>
+          <div class="row g-2 mb-3">
+            <div class="col-sm-5">
+              <label class="form-label" for="merchant">Merchant name</label>
+              <input id="merchant" class="form-control" formControlName="merchantName" [class.is-invalid]="invalid('merchantName')">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label" for="mcc">Category</label>
+              <select id="mcc" class="form-select" formControlName="merchantCategoryCode">
+                @for (c of categories(); track c.code) {
+                  <option [value]="c.code">{{ c.description }} ({{ c.code }})</option>
+                }
+              </select>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label" for="amount">Amount</label>
+              <input id="amount" type="number" class="form-control" formControlName="amount" [class.is-invalid]="invalid('amount')">
+            </div>
+          </div>
+
+          <h2 class="h6 text-uppercase text-muted">Card</h2>
+          <div class="mb-2">
+            <label class="form-label" for="number">Card number</label>
+            <input id="number" class="form-control font-monospace" formControlName="cardNumber" inputmode="numeric"
+                   placeholder="4581 2300 0000 0000" [class.is-invalid]="invalid('cardNumber')">
+            <div class="invalid-feedback">16 digits.</div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-4">
+              <label class="form-label" for="expiry">Expiry (MM/YY)</label>
+              <input id="expiry" class="form-control" formControlName="expiry" placeholder="09/31" [class.is-invalid]="invalid('expiry')">
+            </div>
+            <div class="col-4">
+              <label class="form-label" for="cvv">CVV</label>
+              <input id="cvv" type="password" class="form-control" formControlName="cvv" maxlength="3" inputmode="numeric"
+                     [class.is-invalid]="invalid('cvv')">
+            </div>
+            <div class="col-4">
+              <label class="form-label" for="pin">PIN</label>
+              <input id="pin" type="password" class="form-control" formControlName="pin" maxlength="4" inputmode="numeric"
+                     [class.is-invalid]="invalid('pin')">
+            </div>
+          </div>
+
+          <button class="btn btn-primary w-100" type="submit" [disabled]="busy()">
+            {{ busy() ? 'Authorizing…' : 'Pay ' + (form.controls.amount.value | currency: currency) }}
+          </button>
+          <div class="form-text">Tip: use "Show card number" on My cards to get the number. 3 wrong PINs block the card.</div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    @if (result(); as r) {
+      <div class="card shadow-sm border-2" [class.border-success]="r.approved" [class.border-danger]="!r.approved">
+        <div class="card-body text-center py-4">
+          <div class="display-6 mb-2" [class.text-success]="r.approved" [class.text-danger]="!r.approved">
+            {{ r.approved ? 'APPROVED' : 'DECLINED' }}
+          </div>
+          @if (!r.approved) {
+            <p class="fw-semibold">{{ r.declineReason }}</p>
+          }
+          <dl class="row text-start small mb-0">
+            <dt class="col-6">Amount</dt><dd class="col-6">{{ r.amount | currency: currency }}</dd>
+            @if (r.maskedCardNumber) {
+              <dt class="col-6">Card</dt><dd class="col-6 font-monospace">{{ r.maskedCardNumber }}</dd>
+            }
+            @if (r.transactionId) {
+              <dt class="col-6">Transaction #</dt><dd class="col-6">{{ r.transactionId }}</dd>
+            }
+            @if (r.availableBalance !== null) {
+              <dt class="col-6">Available now</dt><dd class="col-6">{{ r.availableBalance | currency: currency }}</dd>
+            }
+          </dl>
+        </div>
+      </div>
+    } @else {
+      <div class="alert alert-secondary">The authorization result will appear here.</div>
+    }
+  </div>
+</div>

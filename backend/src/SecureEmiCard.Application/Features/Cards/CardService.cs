@@ -2,6 +2,7 @@ using FluentValidation;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common.Exceptions;
+using SecureEmiCard.Domain.Common;
 using SecureEmiCard.Domain.Entities;
 using SecureEmiCard.Domain.Enums;
 
@@ -29,6 +30,7 @@ public class CardService : ICardService
     private readonly ICardholderRepository _cardholders;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICardEncryptionService _encryption;
+    private readonly ICardLookupHasher _lookupHasher;
     private readonly ISecretHasher _secretHasher;
     private readonly ICardNumberGenerator _generator;
     private readonly ICurrentUser _currentUser;
@@ -38,7 +40,8 @@ public class CardService : ICardService
     private readonly IValidator<RevealCardNumberRequest> _revealValidator;
 
     public CardService(ICreditCardRepository cards, ICardholderRepository cardholders, IUnitOfWork unitOfWork,
-                       ICardEncryptionService encryption, ISecretHasher secretHasher, ICardNumberGenerator generator,
+                       ICardEncryptionService encryption, ICardLookupHasher lookupHasher,
+                       ISecretHasher secretHasher, ICardNumberGenerator generator,
                        ICurrentUser currentUser,
                        IValidator<IssueCardRequest> issueValidator,
                        IValidator<UpdateCreditLimitRequest> limitValidator,
@@ -49,6 +52,7 @@ public class CardService : ICardService
         _cardholders = cardholders;
         _unitOfWork = unitOfWork;
         _encryption = encryption;
+        _lookupHasher = lookupHasher;
         _secretHasher = secretHasher;
         _generator = generator;
         _currentUser = currentUser;
@@ -71,13 +75,21 @@ public class CardService : ICardService
             throw new ConflictException("Cards can only be issued to cardholder accounts.");
 
         // Secrets exist in clear text only in memory, for the duration of this request.
-        var cardNumber = _generator.GenerateCardNumber();
+        // The blind index lets us guarantee the generated number is not already in use.
+        string cardNumber, cardNumberHash;
+        do
+        {
+            cardNumber = _generator.GenerateCardNumber();
+            cardNumberHash = _lookupHasher.Compute(cardNumber);
+        } while (await _cards.NumberHashExistsAsync(cardNumberHash, ct));
+
         var cvv = _generator.GenerateCvv();
         var pin = _generator.GeneratePin();
 
         var card = new CreditCard(
             cardholderId: cardholder.CardholderId,
             cardNumberEncrypted: _encryption.Encrypt(cardNumber),
+            cardNumberHash: cardNumberHash,
             maskedCardNumber: CardNumberGenerator.Mask(cardNumber),
             cvvHash: _secretHasher.Hash(cvv),
             pinHash: _secretHasher.Hash(pin),
@@ -87,26 +99,26 @@ public class CardService : ICardService
         await _cards.AddAsync(card, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
-        return new IssuedCardResponse(ToDto(card), cardNumber, cvv, pin);
+        return new IssuedCardResponse(card.ToDto(), cardNumber, cvv, pin);
     }
 
     public async Task<IReadOnlyList<CardDto>> GetMyCardsAsync(CancellationToken ct = default)
-        => (await _cards.GetByCardholderAsync(_currentUser.UserId, ct)).Select(ToDto).ToList();
+        => (await _cards.GetByCardholderAsync(_currentUser.UserId, ct)).Select(c => c.ToDto()).ToList();
 
     public async Task<IReadOnlyList<CardDto>> GetAllCardsAsync(CancellationToken ct = default)
     {
         EnsureAdmin();
-        return (await _cards.GetAllAsync(ct)).Select(ToDto).ToList();
+        return (await _cards.GetAllAsync(ct)).Select(c => c.ToDto()).ToList();
     }
 
     public async Task<IReadOnlyList<CardDto>> GetCardsOfCardholderAsync(int cardholderId, CancellationToken ct = default)
     {
         EnsureAdmin();
-        return (await _cards.GetByCardholderAsync(cardholderId, ct)).Select(ToDto).ToList();
+        return (await _cards.GetByCardholderAsync(cardholderId, ct)).Select(c => c.ToDto()).ToList();
     }
 
     public async Task<CardDto> GetCardAsync(int cardId, CancellationToken ct = default)
-        => ToDto(await GetAccessibleCardAsync(cardId, ct));
+        => (await GetAccessibleCardAsync(cardId, ct)).ToDto();
 
     public async Task<CardDto> BlockCardAsync(int cardId, CancellationToken ct = default)
     {
@@ -114,7 +126,7 @@ public class CardService : ICardService
         var card = await GetAccessibleCardAsync(cardId, ct);
         card.Block();
         await _unitOfWork.SaveChangesAsync(ct);
-        return ToDto(card);
+        return card.ToDto();
     }
 
     public async Task<CardDto> ActivateCardAsync(int cardId, CancellationToken ct = default)
@@ -124,7 +136,7 @@ public class CardService : ICardService
         var card = await GetCardOrThrowAsync(cardId, ct);
         card.Activate();
         await _unitOfWork.SaveChangesAsync(ct);
-        return ToDto(card);
+        return card.ToDto();
     }
 
     public async Task<CardDto> UpdateCreditLimitAsync(int cardId, UpdateCreditLimitRequest request, CancellationToken ct = default)
@@ -134,16 +146,14 @@ public class CardService : ICardService
         var card = await GetCardOrThrowAsync(cardId, ct);
         card.UpdateCreditLimit(request.NewCreditLimit);
         await _unitOfWork.SaveChangesAsync(ct);
-        return ToDto(card);
+        return card.ToDto();
     }
 
     public async Task ChangePinAsync(int cardId, ChangePinRequest request, CancellationToken ct = default)
     {
         await _pinValidator.ValidateAndThrowAsync(request, ct);
         var card = await GetOwnCardAsync(cardId, ct);
-
-        if (!_secretHasher.Verify(request.CurrentPin, card.PinHash))
-            throw new UnauthorizedException("Current PIN is incorrect.");
+        await VerifyPinOrThrowAsync(card, request.CurrentPin, ct);
 
         card.ChangePin(_secretHasher.Hash(request.NewPin));
         await _unitOfWork.SaveChangesAsync(ct);
@@ -153,9 +163,8 @@ public class CardService : ICardService
     {
         await _revealValidator.ValidateAndThrowAsync(request, ct);
         var card = await GetOwnCardAsync(cardId, ct);
-
-        if (!_secretHasher.Verify(request.Pin, card.PinHash))
-            throw new UnauthorizedException("PIN is incorrect.");
+        await VerifyPinOrThrowAsync(card, request.Pin, ct);
+        await _unitOfWork.SaveChangesAsync(ct); // persists a reset of the failed-attempt counter
 
         return new RevealCardNumberResponse(card.CardId, _encryption.Decrypt(card.CardNumberEncrypted));
     }
@@ -188,10 +197,24 @@ public class CardService : ICardService
         return card;
     }
 
+    /// <summary>
+    /// Applies the 3-strikes PIN rule. A wrong PIN is saved BEFORE throwing, otherwise the
+    /// failed-attempt counter would be rolled back and an attacker could guess forever.
+    /// </summary>
+    private async Task VerifyPinOrThrowAsync(CreditCard card, string pin, CancellationToken ct)
+    {
+        if (!card.IsActive)
+            throw new DomainException("This card is blocked. Contact the bank to unblock it.");
+
+        var result = PinCheck.Verify(_secretHasher, card, pin);
+        if (result == PinCheckResult.Valid) return;
+
+        await _unitOfWork.SaveChangesAsync(ct);
+        throw new UnauthorizedException(result == PinCheckResult.LockedOut
+            ? "Incorrect PIN. The card has been blocked after too many wrong attempts."
+            : $"Incorrect PIN. {card.RemainingPinAttempts} attempt(s) left before the card is blocked.");
+    }
+
     private static DateOnly EndOfMonth(DateTime date) =>
         new(date.Year, date.Month, DateTime.DaysInMonth(date.Year, date.Month));
-
-    private static CardDto ToDto(CreditCard c) =>
-        new(c.CardId, c.CardholderId, c.MaskedCardNumber, c.CreditLimit, c.AvailableBalance,
-            c.OutstandingAmount, c.CardStatus.ToString(), c.ExpiryDate, c.CreatedAt);
 }

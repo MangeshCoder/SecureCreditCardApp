@@ -63,3 +63,24 @@ public class SecurityServiceTests
         Assert.False(attacker.Verify("2580", hash)); // DB dump alone is not enough
     }
 }
+
+public class CardLookupHasherTests
+{
+    [Fact]
+    public void Blind_index_is_deterministic_keyed_and_hides_the_number()
+    {
+        var sut = new HmacCardLookupHasher(TestKeys.Encryption());
+
+        var h1 = sut.Compute("4111111111111111");
+        Assert.Equal(h1, sut.Compute("4111111111111111"));          // same input -> same value (searchable)
+        Assert.NotEqual(h1, sut.Compute("4111111111111129"));
+        Assert.Equal(64, h1.Length);
+        Assert.DoesNotContain("1111", h1);
+
+        var otherKey = Microsoft.Extensions.Options.Options.Create(new EncryptionOptions
+        {
+            SecretPepper = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+        });
+        Assert.NotEqual(h1, new HmacCardLookupHasher(otherKey).Compute("4111111111111111")); // needs the secret key
+    }
+}

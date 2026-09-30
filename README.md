@@ -9,7 +9,7 @@ A secure credit card application built **module by module** from the
 | API | ASP.NET Core 8 Web API, JWT Bearer (HMAC-SHA512), Swagger, rate limiting |
 | Business | Clean Architecture: Domain → Application → Infrastructure → API, FluentValidation |
 | Data | SQL Server 2022 / Azure SQL, EF Core 8 (repository + unit of work) |
-| Security | AES-256-GCM (card numbers), PBKDF2 (passwords), peppered PBKDF2 (CVV/PIN) |
+| Security | AES-256-GCM (card numbers), HMAC blind index (card lookup), PBKDF2 (passwords), peppered PBKDF2 (CVV/PIN), PIN lockout, optimistic concurrency |
 
 ## Repository layout
 
@@ -31,8 +31,8 @@ SecureCreditCardApp/
 | # | Module | Status |
 |---|---|---|
 | 1 | [Foundation + Cardholder & Card Lifecycle Management](docs/01-Module-1-Cardholders-and-Cards.md) | ✅ Done |
-| 2 | Merchant Swipe & Load Operations (transactions ledger) | ⏳ Next |
-| 3 | Automated Cashback Reward Engine | ⏳ |
+| 2 | [Merchant Swipe & Load Operations (transactions ledger)](docs/02-Module-2-Swipe-and-Load.md) | ✅ Done |
+| 3 | Automated Cashback Reward Engine | ⏳ Next |
 | 4 | EMI Conversion Engine (amortization + schedules) | ⏳ |
 | 5 | Inter-Bank Payload Security (AES payload encryption + HMAC signatures + audit log) | ⏳ |
 | 6 | Deployment (Docker, Azure App Service, Key Vault, CI/CD) | ⏳ |
@@ -44,8 +44,9 @@ See [docs/00-Roadmap.md](docs/00-Roadmap.md) for the full plan.
 **Prerequisites:** .NET 8 SDK, Node.js 22.12+ (or 20.19+), SQL Server 2022 (LocalDB, Developer edition or Docker).
 
 ```bash
-# 1. Database
+# 1. Database (run every script in database/ in order – see database/README.md)
 sqlcmd -S localhost -E -i database/01a_Database_Schema_Core_Tables.sql
+sqlcmd -S localhost -E -i database/02_Module2_Transactions.sql
 
 # 2. API  -> http://localhost:5080/swagger
 cd backend

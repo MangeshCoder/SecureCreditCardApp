@@ -626,7 +626,7 @@ then try the other endpoints.
 - [x] Role-based access at the controller **and** service level; ownership checks return 404
 - [x] No account enumeration on login; generic 500 errors; security headers; strict CORS
 - [x] Secrets validated at start-up; production secrets outside source control
-- [ ] Account lockout after N wrong PINs (Module 2, together with swipe PIN checks)
+- [x] Card lockout after 3 wrong PINs (added in Module 2, applies to these endpoints too)
 - [ ] Audit log of sensitive actions (Module 5 – `SecurityAuditLogs`)
 - [ ] HSM / Key Vault backed keys and key rotation (Module 6)
 
@@ -634,7 +634,7 @@ then try the other endpoints.
 
 ## What's next – Module 2
 
-**Merchant Swipe & Load Operations:** the `Transactions` table, a swipe authorization flow (card
+[Module 2 guide →](02-Module-2-Swipe-and-Load.md) **Merchant Swipe & Load Operations:** the `Transactions` table, a swipe authorization flow (card
 active and not expired, CVV/PIN check, sufficient `AvailableBalance`), loads/repayments and refunds
 that restore the balance, a transaction ledger per card, and concurrency protection so two
 simultaneous swipes can't overspend the limit.

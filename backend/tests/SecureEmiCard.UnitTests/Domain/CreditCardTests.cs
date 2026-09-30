@@ -7,7 +7,7 @@ namespace SecureEmiCard.UnitTests.Domain;
 public class CreditCardTests
 {
     private static CreditCard NewCard(decimal limit = 10_000m) =>
-        new(1, "enc", "XXXX-XXXX-XXXX-1234", "cvv", "pin", limit, DateOnly.FromDateTime(DateTime.UtcNow.AddYears(5)));
+        new(1, "enc", "hash", "XXXX-XXXX-XXXX-1234", "cvv", "pin", limit, DateOnly.FromDateTime(DateTime.UtcNow.AddYears(5)));
 
     [Fact]
     public void New_card_is_active_with_full_available_balance()

@@ -1,0 +1,58 @@
+<h1 class="h3 mb-4">Transactions</h1>
+
+@if (message()) {
+  <div class="alert alert-success alert-dismissible">
+    {{ message() }}
+    <button type="button" class="btn-close" (click)="message.set(null)"></button>
+  </div>
+}
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+@if (ledger(); as l) {
+  <div class="table-responsive">
+    <table class="table table-hover bg-white shadow-sm align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Date</th><th>Card</th><th>Merchant</th><th>Type</th><th>Status</th><th class="text-end">Amount</th><th></th></tr>
+      </thead>
+      <tbody>
+        @for (t of l.items; track t.transactionId) {
+          <tr>
+            <td>{{ t.transactionId }}</td>
+            <td class="text-nowrap">{{ t.transactionDate | date: 'short' }}</td>
+            <td class="font-monospace"><a [routerLink]="['/cards', t.cardId, 'transactions']">{{ t.maskedCardNumber }}</a></td>
+            <td>
+              {{ t.merchantName }} <span class="small text-muted">MCC {{ t.merchantCategoryCode }}</span>
+              @if (t.declineReason) { <div class="small text-danger">{{ t.declineReason }}</div> }
+            </td>
+            <td>{{ t.transactionType }}</td>
+            <td><span class="badge" [class]="statusBadge(t)">{{ t.transactionStatus }}</span></td>
+            <td class="text-end">
+              @if (t.transactionStatus === 'Declined') {
+                <s class="text-muted">{{ t.amount | currency: currency }}</s>
+              } @else {
+                {{ signedAmount(t) | currency: currency }}
+              }
+            </td>
+            <td class="text-end">
+              @if (t.transactionType === 'Swipe' && t.transactionStatus === 'Completed' && !t.isEmiConverted) {
+                <button class="btn btn-sm btn-outline-warning" (click)="refund(t)">Refund</button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="8" class="text-center text-muted">No transactions yet.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (l.totalPages > 1) {
+    <nav class="d-flex justify-content-between align-items-center">
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="l.page <= 1" (click)="loadPage(l.page - 1)">&larr; Newer</button>
+      <span class="small text-muted">Page {{ l.page }} of {{ l.totalPages }} ({{ l.totalCount }} transactions)</span>
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="l.page >= l.totalPages" (click)="loadPage(l.page + 1)">Older &rarr;</button>
+    </nav>
+  }
+}

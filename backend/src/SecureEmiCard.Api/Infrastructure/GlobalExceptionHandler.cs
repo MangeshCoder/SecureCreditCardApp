@@ -35,6 +35,7 @@ public class GlobalExceptionHandler : IExceptionHandler
             },
             DomainException => Problem(StatusCodes.Status400BadRequest, "Business rule violated", exception.Message),
             NotFoundException => Problem(StatusCodes.Status404NotFound, "Not found", exception.Message),
+            ConcurrencyConflictException => Problem(StatusCodes.Status409Conflict, "Conflict", exception.Message),
             ConflictException => Problem(StatusCodes.Status409Conflict, "Conflict", exception.Message),
             UnauthorizedException => Problem(StatusCodes.Status401Unauthorized, "Unauthorized", exception.Message),
             ForbiddenException => Problem(StatusCodes.Status403Forbidden, "Forbidden", exception.Message),

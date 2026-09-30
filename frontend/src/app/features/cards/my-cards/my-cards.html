@@ -47,8 +47,13 @@
               <div class="fw-semibold text-success">{{ card.availableBalance | currency: currency }}</div>
             </div>
             <div class="col">
-              <div class="small text-muted">Outstanding</div>
-              <div class="fw-semibold text-danger">{{ card.outstandingAmount | currency: currency }}</div>
+              @if (card.outstandingAmount >= 0) {
+                <div class="small text-muted">Outstanding</div>
+                <div class="fw-semibold text-danger">{{ card.outstandingAmount | currency: currency }}</div>
+              } @else {
+                <div class="small text-muted">Credit balance</div>
+                <div class="fw-semibold text-success">{{ -card.outstandingAmount | currency: currency }}</div>
+              }
             </div>
           </div>
 
@@ -56,10 +61,14 @@
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-outline-primary btn-sm" (click)="open(card.cardId, 'reveal')">Show card number</button>
               <button class="btn btn-outline-secondary btn-sm" (click)="open(card.cardId, 'pin')">Change PIN</button>
+              <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', card.cardId, 'transactions']">Statement / Pay bill</a>
               <button class="btn btn-outline-danger btn-sm ms-auto" (click)="block(card)">Block card</button>
             </div>
           } @else {
-            <p class="text-muted small mb-0">This card is blocked. Contact the bank to unblock it.</p>
+            <div class="d-flex align-items-center gap-2">
+              <p class="text-muted small mb-0 me-auto">This card is blocked. Contact the bank to unblock it.</p>
+              <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', card.cardId, 'transactions']">Statement / Pay bill</a>
+            </div>
           }
 
           @if (panel()?.cardId === card.cardId && panel()?.kind === 'pin') {

@@ -13,6 +13,12 @@ public class CreditCardRepository : ICreditCardRepository
     public Task<CreditCard?> GetByIdAsync(int cardId, CancellationToken ct = default) =>
         _db.CreditCards.FirstOrDefaultAsync(c => c.CardId == cardId, ct);
 
+    public Task<CreditCard?> GetByNumberHashAsync(string cardNumberHash, CancellationToken ct = default) =>
+        _db.CreditCards.FirstOrDefaultAsync(c => c.CardNumberHash == cardNumberHash, ct);
+
+    public Task<bool> NumberHashExistsAsync(string cardNumberHash, CancellationToken ct = default) =>
+        _db.CreditCards.AnyAsync(c => c.CardNumberHash == cardNumberHash, ct);
+
     public async Task<IReadOnlyList<CreditCard>> GetByCardholderAsync(int cardholderId, CancellationToken ct = default) =>
         await _db.CreditCards.AsNoTracking().Where(c => c.CardholderId == cardholderId)
                  .OrderBy(c => c.CardId).ToListAsync(ct);

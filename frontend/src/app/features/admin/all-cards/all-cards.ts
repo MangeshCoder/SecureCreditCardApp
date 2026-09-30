@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { Card } from '../../../core/models/card.models';
 import { CardService } from '../../../core/services/card.service';
@@ -8,7 +9,7 @@ import { apiErrorMessages } from '../../../core/utils/api-error';
 
 @Component({
   selector: 'app-all-cards',
-  imports: [CurrencyPipe, DatePipe, FormsModule],
+  imports: [CurrencyPipe, DatePipe, FormsModule, RouterLink],
   templateUrl: './all-cards.html'
 })
 export class AllCards implements OnInit {

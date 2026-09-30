@@ -20,6 +20,23 @@ export const routes: Routes = [
     loadComponent: () => import('./features/cards/my-cards/my-cards').then(m => m.MyCards)
   },
   {
+    path: 'cards/:cardId/transactions',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/transactions/card-transactions/card-transactions').then(m => m.CardTransactions)
+  },
+  {
+    path: 'pay',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/transactions/checkout/checkout').then(m => m.Checkout)
+  },
+  {
+    path: 'admin/transactions',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./features/admin/all-transactions/all-transactions').then(m => m.AllTransactions)
+  },
+  {
     path: 'admin/cardholders',
     canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/cardholders/cardholders').then(m => m.Cardholders)

@@ -40,6 +40,7 @@ public class CardServiceTests
         _sut = new CardService(
             new CreditCardRepository(_db), new CardholderRepository(_db), _db,
             new AesGcmCardEncryptionService(TestKeys.Encryption()),
+            new HmacCardLookupHasher(TestKeys.Encryption()),
             new PepperedSecretHasher(TestKeys.Encryption(), iterations: 1_000),
             new CardNumberGenerator(), _user,
             new IssueCardRequestValidator(), new UpdateCreditLimitRequestValidator(),

@@ -11,10 +11,13 @@ namespace SecureEmiCard.Domain.Entities;
 /// </summary>
 public class CreditCard
 {
+    /// <summary>Consecutive wrong PINs after which the card is blocked automatically.</summary>
+    public const int MaxFailedPinAttempts = 3;
+
     // Required by EF Core
     private CreditCard() { }
 
-    public CreditCard(int cardholderId, string cardNumberEncrypted, string maskedCardNumber,
+    public CreditCard(int cardholderId, string cardNumberEncrypted, string cardNumberHash, string maskedCardNumber,
                       string cvvHash, string pinHash, decimal creditLimit, DateOnly expiryDate)
     {
         if (creditLimit <= 0) throw new DomainException("Credit limit must be greater than zero.");
@@ -23,6 +26,7 @@ public class CreditCard
 
         CardholderId = cardholderId;
         CardNumberEncrypted = cardNumberEncrypted;
+        CardNumberHash = cardNumberHash;
         MaskedCardNumber = maskedCardNumber;
         CvvHash = cvvHash;
         PinHash = pinHash;
@@ -36,6 +40,8 @@ public class CreditCard
     public int CardId { get; private set; }
     public int CardholderId { get; private set; }
     public string CardNumberEncrypted { get; private set; } = string.Empty;
+    /// <summary>HMAC-SHA256 "blind index" of the card number, used to find a card from a swipe (Module 2).</summary>
+    public string? CardNumberHash { get; private set; }
     public string MaskedCardNumber { get; private set; } = string.Empty;
     public string CvvHash { get; private set; } = string.Empty;
     public string PinHash { get; private set; } = string.Empty;
@@ -44,13 +50,19 @@ public class CreditCard
     public CardStatus CardStatus { get; private set; }
     public DateOnly ExpiryDate { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public int FailedPinAttempts { get; private set; }
 
     public Cardholder? Cardholder { get; private set; }
 
-    /// <summary>Amount currently spent on the card (dynamic balance calculation).</summary>
+    /// <summary>
+    /// Amount currently owed on the card (dynamic balance calculation).
+    /// Negative means a credit balance: the bank owes the customer (e.g. a refund after repayment).
+    /// </summary>
     public decimal OutstandingAmount => CreditLimit - AvailableBalance;
 
     public bool IsExpired => ExpiryDate < DateOnly.FromDateTime(DateTime.UtcNow);
+
+    public bool IsActive => CardStatus == CardStatus.Active;
 
     public void Block()
     {
@@ -63,6 +75,7 @@ public class CreditCard
         if (CardStatus == CardStatus.Active) throw new DomainException("Card is already active.");
         if (IsExpired) throw new DomainException("An expired card cannot be activated.");
         CardStatus = CardStatus.Active;
+        FailedPinAttempts = 0; // unblocking by the bank gives the customer fresh PIN attempts
     }
 
     /// <summary>
@@ -72,7 +85,7 @@ public class CreditCard
     public void UpdateCreditLimit(decimal newLimit)
     {
         if (newLimit <= 0) throw new DomainException("Credit limit must be greater than zero.");
-        var outstanding = OutstandingAmount;
+        var outstanding = OutstandingAmount; // may be negative (credit balance) - it is carried over
         if (newLimit < outstanding)
             throw new DomainException($"Credit limit cannot be lower than the outstanding amount ({outstanding:0.00}).");
 
@@ -86,4 +99,70 @@ public class CreditCard
         if (string.IsNullOrWhiteSpace(newPinHash)) throw new DomainException("PIN hash is required.");
         PinHash = newPinHash;
     }
+
+    /// <summary>Used once to back-fill cards issued before the blind index existed.</summary>
+    public void SetCardNumberHash(string cardNumberHash)
+    {
+        if (CardNumberHash is not null) throw new DomainException("Card number hash is already set.");
+        CardNumberHash = cardNumberHash;
+    }
+
+    // ---- Module 2: money movements ------------------------------------------------------
+
+    /// <summary>
+    /// Returns why a swipe of this amount must be declined, or null if it can be approved.
+    /// Used by the authorization flow so every decline reason is decided in one place.
+    /// </summary>
+    public string? GetSwipeDeclineReason(decimal amount)
+    {
+        if (CardStatus == CardStatus.Blocked) return DeclineReasons.CardBlocked;
+        if (IsExpired) return DeclineReasons.CardExpired;
+        if (amount > AvailableBalance) return DeclineReasons.InsufficientCredit;
+        return null;
+    }
+
+    /// <summary>Purchase: reduces the available balance.</summary>
+    public void Debit(decimal amount)
+    {
+        if (amount <= 0) throw new DomainException("Amount must be greater than zero.");
+        var reason = GetSwipeDeclineReason(amount);
+        if (reason is not null) throw new DomainException(reason);
+        AvailableBalance -= amount;
+    }
+
+    /// <summary>
+    /// Repayment / balance load: increases the available balance. A customer cannot pay more than
+    /// they owe. Allowed on blocked cards - a customer must always be able to repay.
+    /// </summary>
+    public void Credit(decimal amount)
+    {
+        if (amount <= 0) throw new DomainException("Amount must be greater than zero.");
+        if (amount > OutstandingAmount)
+            throw new DomainException($"Amount exceeds the outstanding amount ({Math.Max(0, OutstandingAmount):0.00}).");
+        AvailableBalance += amount;
+    }
+
+    /// <summary>
+    /// Merchant refund: always accepted, even if the purchase was already repaid. In that case the
+    /// available balance goes above the credit limit, i.e. the card has a credit balance.
+    /// </summary>
+    public void CreditRefund(decimal amount)
+    {
+        if (amount <= 0) throw new DomainException("Amount must be greater than zero.");
+        AvailableBalance += amount;
+    }
+
+    // ---- Module 2: PIN lockout ----------------------------------------------------------
+
+    public int RemainingPinAttempts => Math.Max(0, MaxFailedPinAttempts - FailedPinAttempts);
+
+    /// <summary>Records a wrong PIN; blocks the card after <see cref="MaxFailedPinAttempts"/> in a row.</summary>
+    public void RegisterFailedPinAttempt()
+    {
+        FailedPinAttempts++;
+        if (FailedPinAttempts >= MaxFailedPinAttempts && CardStatus == CardStatus.Active)
+            CardStatus = CardStatus.Blocked;
+    }
+
+    public void ResetFailedPinAttempts() => FailedPinAttempts = 0;
 }

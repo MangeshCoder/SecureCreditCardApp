@@ -25,6 +25,8 @@ public static class DbInitializer
         if (db.Database.IsInMemory())
             await db.Database.EnsureCreatedAsync(ct);
 
+        await BackfillCardNumberHashesAsync(scope.ServiceProvider, db, logger, ct);
+
         var email = config["SeedAdmin:Email"];
         var password = config["SeedAdmin:Password"];
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
@@ -39,5 +41,23 @@ public static class DbInitializer
                                           hasher.Hash(password), UserRole.Admin));
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Seeded admin account {Email}", normalized);
+    }
+
+    /// <summary>
+    /// Module 2 added CreditCards.CardNumberHash. Cards issued in Module 1 have NULL there;
+    /// decrypt their number once and store the blind index so they can be swiped.
+    /// </summary>
+    private static async Task BackfillCardNumberHashesAsync(IServiceProvider sp, AppDbContext db, ILogger logger, CancellationToken ct)
+    {
+        var cards = await db.CreditCards.Where(c => c.CardNumberHash == null).ToListAsync(ct);
+        if (cards.Count == 0) return;
+
+        var encryption = sp.GetRequiredService<ICardEncryptionService>();
+        var lookup = sp.GetRequiredService<ICardLookupHasher>();
+        foreach (var card in cards)
+            card.SetCardNumberHash(lookup.Compute(encryption.Decrypt(card.CardNumberEncrypted)));
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Back-filled the card number lookup hash for {Count} card(s)", cards.Count);
     }
 }

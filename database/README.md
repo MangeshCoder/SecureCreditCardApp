@@ -3,21 +3,21 @@
 The SQL scripts are the **source of truth** for the schema. EF Core only maps onto these tables
 (it does not create them), which is common in banks where DBAs review every schema change.
 
-Run the scripts in order. Each module adds its own script:
+Run the scripts **in order**. Each module adds its own script, and every script is idempotent
+(safe to run again).
 
-| Script | Module | Tables |
+| Script | Module | What it does |
 |---|---|---|
-| `01a_Database_Schema_Core_Tables.sql` | 1 – Cardholders & Cards | `Cardholders`, `CreditCards` |
-| `01b_Database_Schema_EMI_Tables.sql` | 2/4 – Transactions & EMI | *(coming in a later module)* |
-| `01c_Schedules_Cashback_Audit_Indexes.sql` | 3/4/5 – Schedules, Cashback, Audit | *(coming in a later module)* |
+| `01a_Database_Schema_Core_Tables.sql` | 1 – Cardholders & Cards | creates the database, `Cardholders`, `CreditCards` |
+| `02_Module2_Transactions.sql` | 2 – Swipe & Load | adds `CreditCards.CardNumberHash` + `FailedPinAttempts`, creates `Transactions` |
+| `03_...` | 3 – Cashback | *(coming)* `CashbackLogs` |
+| `04_...` | 4 – EMI | *(coming)* `EmiPlans`, `EmiSchedules` |
+| `05_...` | 5 – Inter-bank security | *(coming)* `SecurityAuditLogs` |
 
-```bash
-# Windows auth, local SQL Server
-sqlcmd -S localhost -E -i database/01a_Database_Schema_Core_Tables.sql
-
-# SQL Server in Docker (sa login)
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Your_strong_Passw0rd" -p 1433:1433 -d mcr.microsoft.com/mssql/server:2022-latest
-sqlcmd -S localhost -U sa -P "Your_strong_Passw0rd" -C -i database/01a_Database_Schema_Core_Tables.sql
+```powershell
+# SQL Express with Windows login (adjust the server name to yours)
+sqlcmd -S localhost\SQLEXPRESS -E -i database\01a_Database_Schema_Core_Tables.sql
+sqlcmd -S localhost\SQLEXPRESS -E -i database\02_Module2_Transactions.sql
 ```
 
-The scripts are idempotent (`IF ... IS NULL`), so running them again is safe.
+Or open the file in SSMS and press **Execute** (F5).

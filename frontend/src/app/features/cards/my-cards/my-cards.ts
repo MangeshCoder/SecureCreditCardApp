@@ -1,6 +1,7 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { Card } from '../../../core/models/card.models';
 import { CardService } from '../../../core/services/card.service';
@@ -12,7 +13,7 @@ const PIN = [Validators.required, Validators.pattern(/^\d{4}$/)];
 
 @Component({
   selector: 'app-my-cards',
-  imports: [CurrencyPipe, DatePipe, ReactiveFormsModule],
+  imports: [CurrencyPipe, DatePipe, ReactiveFormsModule, RouterLink],
   templateUrl: './my-cards.html'
 })
 export class MyCards implements OnInit, OnDestroy {

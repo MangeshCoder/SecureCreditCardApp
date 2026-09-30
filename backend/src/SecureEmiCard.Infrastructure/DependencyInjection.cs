@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ICardholderRepository, CardholderRepository>();
         services.AddScoped<ICreditCardRepository, CreditCardRepository>();
+        services.AddScoped<ITransactionRepository, TransactionRepository>();
 
         // ---- Security --------------------------------------------------------------
         services.AddOptions<EncryptionOptions>()
@@ -44,6 +45,7 @@ public static class DependencyInjection
 
         services.AddSingleton<ICardEncryptionService, AesGcmCardEncryptionService>();
         services.AddSingleton<ISecretHasher, PepperedSecretHasher>();
+        services.AddSingleton<ICardLookupHasher, HmacCardLookupHasher>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 

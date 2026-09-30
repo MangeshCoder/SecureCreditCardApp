@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SecureEmiCard.Application.Abstractions.Persistence;
+using SecureEmiCard.Application.Common.Exceptions;
 using SecureEmiCard.Domain.Entities;
 
 namespace SecureEmiCard.Infrastructure.Persistence;
@@ -15,9 +16,25 @@ public class AppDbContext : DbContext, IUnitOfWork
 
     public DbSet<Cardholder> Cardholders => Set<Cardholder>();
     public DbSet<CreditCard> CreditCards => Set<CreditCard>();
+    public DbSet<CardTransaction> Transactions => Set<CardTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
+
+    /// <summary>Translates EF's concurrency exception into the application's own exception type.</summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConcurrencyConflictException("The record was modified by another request. Please retry.", ex);
+        }
+    }
+
+    public void ClearChanges() => ChangeTracker.Clear();
 }
