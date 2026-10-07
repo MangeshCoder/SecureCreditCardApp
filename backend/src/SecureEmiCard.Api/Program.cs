@@ -105,10 +105,12 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
+    // Production: force HTTPS. In Development we don't redirect, because the Angular dev server
+    // calls http://localhost:5080 and browsers refuse to follow a redirect on a CORS preflight
+    // (OPTIONS) request - the login would fail with "Cannot reach the server".
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
-
-app.UseHttpsRedirection();
 
 app.Use(async (context, next) =>
 {
