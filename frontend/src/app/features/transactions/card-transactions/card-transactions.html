@@ -1,5 +1,8 @@
 <a class="small" [routerLink]="auth.isAdmin() ? '/admin/cards' : '/cards'">&larr; Back to cards</a>
-<h1 class="h3 mt-2 mb-4">Card statement</h1>
+<div class="d-flex align-items-center mt-2 mb-4">
+  <h1 class="h3 mb-0 me-auto">Card statement</h1>
+  <a class="btn btn-outline-success btn-sm" [routerLink]="['/cards', cardId(), 'rewards']">Cashback rewards</a>
+</div>
 
 @if (message()) {
   <div class="alert alert-success alert-dismissible">
@@ -65,6 +68,15 @@
             <td>
               {{ t.merchantName }} <span class="small text-muted">MCC {{ t.merchantCategoryCode }}</span>
               @if (t.declineReason) { <div class="small text-danger">{{ t.declineReason }}</div> }
+              @if (t.cashbackEarned) {
+                <div class="small" [class.text-success]="!t.cashbackReversed" [class.text-muted]="t.cashbackReversed">
+                  @if (t.cashbackReversed) {
+                    <s>Cashback +{{ t.cashbackEarned | currency: currency }}</s> reversed (refunded)
+                  } @else {
+                    Cashback +{{ t.cashbackEarned | currency: currency }}
+                  }
+                </div>
+              }
             </td>
             <td>{{ t.transactionType }}</td>
             <td><span class="badge" [class]="statusBadge(t)">{{ t.transactionStatus }}</span></td>

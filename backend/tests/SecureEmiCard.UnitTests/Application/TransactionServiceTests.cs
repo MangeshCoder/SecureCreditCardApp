@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common.Exceptions;
 using SecureEmiCard.Application.Features.Cards;
@@ -50,7 +52,9 @@ public class TransactionServiceTests
             new ChangePinRequestValidator(), new RevealCardNumberRequestValidator());
 
         _sut = new TransactionService(
-            new CreditCardRepository(_db), new TransactionRepository(_db), _db, lookup, hasher, _user,
+            new CreditCardRepository(_db), new TransactionRepository(_db),
+            new CashbackRepository(_db), new CashbackEngine(Options.Create(new CashbackOptions())), _db,
+            lookup, hasher, _user,
             new SwipeRequestValidator(), new LoadRequestValidator());
     }
 
@@ -82,7 +86,8 @@ public class TransactionServiceTests
         var result = await _sut.SwipeAsync(Swipe(card, 250m));
 
         Assert.True(result.Approved);
-        Assert.Equal(750m, result.AvailableBalance);
+        Assert.Equal(7.50m, result.CashbackAmount);           // groceries: 3 % of 250 (Module 3)
+        Assert.Equal(757.50m, result.AvailableBalance);       // 1,000 - 250 + 7.50
         var txn = await _db.Transactions.SingleAsync();
         Assert.Equal(TransactionType.Swipe, txn.TransactionType);
         Assert.Equal(TransactionStatus.Completed, txn.TransactionStatus);
@@ -170,11 +175,13 @@ public class TransactionServiceTests
         var card = await IssueToAlice(1_000m);
         await _sut.SwipeAsync(Swipe(card, 400m));
 
+        // 1,000 - 400 + 12 cashback (3 %) = 612 available, 388 owed
         var loaded = await _sut.LoadAsync(new LoadRequest(card.Card.CardId, 150m));
-        Assert.Equal(750m, loaded.Card.AvailableBalance);
+        Assert.Equal(762m, loaded.Card.AvailableBalance);
         Assert.Equal(nameof(TransactionType.Load), loaded.Transaction.TransactionType);
 
-        await Assert.ThrowsAsync<DomainException>(() => _sut.LoadAsync(new LoadRequest(card.Card.CardId, 250.01m)));
+        // 238 still owed - paying 238.01 is too much
+        await Assert.ThrowsAsync<DomainException>(() => _sut.LoadAsync(new LoadRequest(card.Card.CardId, 238.01m)));
     }
 
     [Fact]

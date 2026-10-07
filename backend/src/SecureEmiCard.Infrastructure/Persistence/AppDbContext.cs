@@ -17,6 +17,7 @@ public class AppDbContext : DbContext, IUnitOfWork
     public DbSet<Cardholder> Cardholders => Set<Cardholder>();
     public DbSet<CreditCard> CreditCards => Set<CreditCard>();
     public DbSet<CardTransaction> Transactions => Set<CardTransaction>();
+    public DbSet<CashbackLog> CashbackLogs => Set<CashbackLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

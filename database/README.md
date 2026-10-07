@@ -10,7 +10,7 @@ Run the scripts **in order**. Each module adds its own script, and every script 
 |---|---|---|
 | `01a_Database_Schema_Core_Tables.sql` | 1 – Cardholders & Cards | creates the database, `Cardholders`, `CreditCards` |
 | `02_Module2_Transactions.sql` | 2 – Swipe & Load | adds `CreditCards.CardNumberHash` + `FailedPinAttempts`, creates `Transactions` |
-| `03_...` | 3 – Cashback | *(coming)* `CashbackLogs` |
+| `03_Module3_Cashback.sql` | 3 – Cashback | creates `CashbackLogs` |
 | `04_...` | 4 – EMI | *(coming)* `EmiPlans`, `EmiSchedules` |
 | `05_...` | 5 – Inter-bank security | *(coming)* `SecurityAuditLogs` |
 
@@ -18,6 +18,7 @@ Run the scripts **in order**. Each module adds its own script, and every script 
 # SQL Express with Windows login (adjust the server name to yours)
 sqlcmd -S localhost\SQLEXPRESS -E -i database\01a_Database_Schema_Core_Tables.sql
 sqlcmd -S localhost\SQLEXPRESS -E -i database\02_Module2_Transactions.sql
+sqlcmd -S localhost\SQLEXPRESS -E -i database\03_Module3_Cashback.sql
 ```
 
 Or open the file in SSMS and press **Execute** (F5).

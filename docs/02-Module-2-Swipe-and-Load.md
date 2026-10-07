@@ -432,6 +432,8 @@ Walk-through:
 
 ## What's next – Module 3
 
+[Module 3 guide →](03-Module-3-Cashback.md)
+
 **Automated Cashback Reward Engine:** a `CashbackLogs` table and a rules engine by Merchant Category
 Code (groceries 5411 → 3 %, dining 5812 → 3 %, fuel 5541 → 2 %, everything else 1 %). Cashback is
 calculated for every **approved** swipe in the same database transaction, reversed when a purchase is

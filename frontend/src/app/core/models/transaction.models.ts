@@ -24,6 +24,9 @@ export interface SwipeResponse {
   amount: number;
   availableBalance: number | null;
   processedAtUtc: string;
+  /** Module 3: cashback credited for an approved swipe (0 if none). */
+  cashbackAmount: number;
+  cashbackPercentage: number;
 }
 
 export interface Transaction {
@@ -38,6 +41,9 @@ export interface Transaction {
   declineReason: string | null;
   isEmiConverted: boolean;
   transactionDate: string;
+  /** Module 3: cashback earned by this swipe, if any. */
+  cashbackEarned: number | null;
+  cashbackReversed: boolean;
 }
 
 export interface BalanceChangeResponse {

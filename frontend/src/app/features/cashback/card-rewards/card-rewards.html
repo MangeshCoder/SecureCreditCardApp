@@ -1,0 +1,120 @@
+<a class="small" [routerLink]="['/cards', cardId(), 'transactions']">&larr; Back to statement</a>
+<h1 class="h3 mt-2 mb-4">Cashback rewards</h1>
+
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+@if (summary(); as s) {
+  <p class="text-muted font-monospace">{{ s.maskedCardNumber }}</p>
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+      <div class="card shadow-sm h-100"><div class="card-body">
+        <div class="small text-muted">Net cashback</div>
+        <div class="fs-3 fw-semibold text-success">{{ s.netCashback | currency: currency }}</div>
+      </div></div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card shadow-sm h-100"><div class="card-body">
+        <div class="small text-muted">This month</div>
+        <div class="fs-3 fw-semibold">{{ s.thisMonth | currency: currency }}</div>
+      </div></div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card shadow-sm h-100"><div class="card-body">
+        <div class="small text-muted">Total earned</div>
+        <div class="fs-3 fw-semibold">{{ s.totalEarned | currency: currency }}</div>
+      </div></div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card shadow-sm h-100"><div class="card-body">
+        <div class="small text-muted">Reversed (refunds)</div>
+        <div class="fs-3 fw-semibold text-muted">{{ -s.totalReversed | currency: currency }}</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h6 text-uppercase text-muted mb-3">By merchant category</h2>
+          @for (c of s.byCategory; track c.merchantCategoryCode) {
+            <div class="mb-2">
+              <div class="d-flex justify-content-between small">
+                <span>{{ c.description }} <span class="text-muted">({{ c.transactionCount }} {{ c.transactionCount === 1 ? 'purchase' : 'purchases' }})</span></span>
+                <span class="fw-semibold">{{ c.amount | currency: currency }}</span>
+              </div>
+              <div class="progress" style="height: 8px">
+                <div class="progress-bar bg-success" [style.width.%]="barWidth(c.amount)"></div>
+              </div>
+            </div>
+          } @empty {
+            <p class="text-muted small mb-0">No cashback yet. Pay with this card in the checkout simulator to earn some.</p>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      @if (rules(); as r) {
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h2 class="h6 text-uppercase text-muted mb-3">How you earn</h2>
+            <table class="table table-sm mb-2">
+              <tbody>
+                @for (rule of r.categoryRules; track rule.merchantCategoryCode) {
+                  <tr><td>{{ rule.description }} <span class="text-muted small">MCC {{ rule.merchantCategoryCode }}</span></td>
+                      <td class="text-end fw-semibold text-success">{{ rule.percentage }}%</td></tr>
+                }
+                <tr><td>Everything else</td><td class="text-end fw-semibold">{{ r.defaultPercentage }}%</td></tr>
+              </tbody>
+            </table>
+            <p class="small text-muted mb-0">
+              Minimum purchase {{ r.minimumSpend | currency: currency }} · maximum
+              {{ r.maxCashbackPerTransaction | currency: currency }} per purchase · credited instantly to your card ·
+              reversed if the purchase is refunded.
+            </p>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (history(); as h) {
+  <h2 class="h5">Cashback history</h2>
+  <div class="table-responsive">
+    <table class="table table-hover bg-white shadow-sm align-middle">
+      <thead class="table-light">
+        <tr><th>Date</th><th>Purchase</th><th class="text-end">Purchase amount</th><th class="text-end">Rate</th><th class="text-end">Cashback</th></tr>
+      </thead>
+      <tbody>
+        @for (c of h.items; track c.cashbackId) {
+          <tr>
+            <td>{{ c.creditedDate | date: 'medium' }}</td>
+            <td>
+              {{ c.merchantName }} <span class="small text-muted">#{{ c.transactionId }}</span>
+              @if (c.cashbackType === 'Reversed') { <span class="badge bg-secondary ms-1">Reversed</span> }
+            </td>
+            <td class="text-end">{{ c.transactionAmount | currency: currency }}</td>
+            <td class="text-end">{{ c.cashbackPercentage }}%</td>
+            <td class="text-end fw-semibold" [class.text-success]="c.cashbackAmount > 0" [class.text-muted]="c.cashbackAmount < 0">
+              {{ c.cashbackAmount > 0 ? '+' : '' }}{{ c.cashbackAmount | currency: currency }}
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="5" class="text-center text-muted">No cashback yet.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (h.totalPages > 1) {
+    <nav class="d-flex justify-content-between align-items-center">
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="h.page <= 1" (click)="loadPage(h.page - 1)">&larr; Newer</button>
+      <span class="small text-muted">Page {{ h.page }} of {{ h.totalPages }}</span>
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="h.page >= h.totalPages" (click)="loadPage(h.page + 1)">Older &rarr;</button>
+    </nav>
+  }
+}

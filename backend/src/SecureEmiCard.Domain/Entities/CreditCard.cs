@@ -152,6 +152,27 @@ public class CreditCard
         AvailableBalance += amount;
     }
 
+    // ---- Module 3: cashback ------------------------------------------------------------
+
+    /// <summary>
+    /// Cashback is paid as a statement credit: it reduces what the customer owes.
+    /// Like a refund it is always accepted (it may create a small credit balance).
+    /// </summary>
+    public void CreditReward(decimal amount)
+    {
+        if (amount <= 0) throw new DomainException("Cashback amount must be greater than zero.");
+        AvailableBalance += amount;
+    }
+
+    /// <summary>Takes back cashback when the purchase that earned it is refunded.</summary>
+    public void ReverseReward(decimal amount)
+    {
+        if (amount <= 0) throw new DomainException("Cashback amount must be greater than zero.");
+        if (amount > AvailableBalance)
+            throw new DomainException("Cashback cannot be reversed: not enough available balance.");
+        AvailableBalance -= amount;
+    }
+
     // ---- Module 2: PIN lockout ----------------------------------------------------------
 
     public int RemainingPinAttempts => Math.Max(0, MaxFailedPinAttempts - FailedPinAttempts);

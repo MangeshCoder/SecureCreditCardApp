@@ -25,7 +25,9 @@ public record SwipeResponse(
     string? MaskedCardNumber,
     decimal Amount,
     decimal? AvailableBalance,
-    DateTime ProcessedAtUtc);
+    DateTime ProcessedAtUtc,
+    decimal CashbackAmount = 0m,
+    decimal CashbackPercentage = 0m);
 
 /// <summary>Repayment / balance load onto a card.</summary>
 public record LoadRequest(int CardId, decimal Amount);
@@ -41,7 +43,9 @@ public record TransactionDto(
     string TransactionStatus,
     string? DeclineReason,
     bool IsEmiConverted,
-    DateTime TransactionDate);
+    DateTime TransactionDate,
+    decimal? CashbackEarned = null,
+    bool CashbackReversed = false);
 
 /// <summary>Returned by load and refund: the new ledger row plus the card's updated balances.</summary>
 public record BalanceChangeResponse(TransactionDto Transaction, CardDto Card);

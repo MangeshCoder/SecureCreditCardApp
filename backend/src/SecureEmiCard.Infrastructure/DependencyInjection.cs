@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
+using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Infrastructure.Persistence;
 using SecureEmiCard.Infrastructure.Persistence.Repositories;
 using SecureEmiCard.Infrastructure.Security;
@@ -28,6 +29,17 @@ public static class DependencyInjection
         services.AddScoped<ICardholderRepository, CardholderRepository>();
         services.AddScoped<ICreditCardRepository, CreditCardRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<ICashbackRepository, CashbackRepository>();
+
+        // ---- Cashback rules (Module 3) ----------------------------------------------------
+        // Defaults live in CashbackOptions; the optional "Cashback" config section overrides them.
+        services.AddOptions<CashbackOptions>()
+            .Bind(configuration.GetSection(CashbackOptions.SectionName))
+            .Validate(o => o.DefaultPercentage is >= 0 and <= 100, "Cashback:DefaultPercentage must be between 0 and 100.")
+            .Validate(o => o.CategoryPercentages.Values.All(p => p is >= 0 and <= 100), "Cashback:CategoryPercentages must be between 0 and 100.")
+            .Validate(o => o.CategoryPercentages.Keys.All(k => k.Length == 4 && k.All(char.IsAsciiDigit)), "Cashback:CategoryPercentages keys must be 4-digit MCCs.")
+            .Validate(o => o.MinimumSpend >= 0 && o.MaxCashbackPerTransaction > 0, "Cashback:MinimumSpend must be >= 0 and MaxCashbackPerTransaction > 0.")
+            .ValidateOnStart();
 
         // ---- Security --------------------------------------------------------------
         services.AddOptions<EncryptionOptions>()

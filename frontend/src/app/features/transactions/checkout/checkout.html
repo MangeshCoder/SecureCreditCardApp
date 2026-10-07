@@ -81,6 +81,10 @@
             @if (r.transactionId) {
               <dt class="col-6">Transaction #</dt><dd class="col-6">{{ r.transactionId }}</dd>
             }
+            @if (r.cashbackAmount > 0) {
+              <dt class="col-6 text-success">Cashback ({{ r.cashbackPercentage }}%)</dt>
+              <dd class="col-6 text-success fw-semibold">+{{ r.cashbackAmount | currency: currency }}</dd>
+            }
             @if (r.availableBalance !== null) {
               <dt class="col-6">Available now</dt><dd class="col-6">{{ r.availableBalance | currency: currency }}</dd>
             }

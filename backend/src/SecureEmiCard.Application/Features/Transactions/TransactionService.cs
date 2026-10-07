@@ -3,6 +3,7 @@ using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common.Exceptions;
 using SecureEmiCard.Application.Common.Models;
+using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Features.Cards;
 using SecureEmiCard.Domain.Common;
 using SecureEmiCard.Domain.Entities;
@@ -37,6 +38,8 @@ public class TransactionService : ITransactionService
 
     private readonly ICreditCardRepository _cards;
     private readonly ITransactionRepository _transactions;
+    private readonly ICashbackRepository _cashback;
+    private readonly ICashbackEngine _cashbackEngine;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICardLookupHasher _lookupHasher;
     private readonly ISecretHasher _secretHasher;
@@ -44,12 +47,15 @@ public class TransactionService : ITransactionService
     private readonly IValidator<SwipeRequest> _swipeValidator;
     private readonly IValidator<LoadRequest> _loadValidator;
 
-    public TransactionService(ICreditCardRepository cards, ITransactionRepository transactions, IUnitOfWork unitOfWork,
+    public TransactionService(ICreditCardRepository cards, ITransactionRepository transactions,
+                              ICashbackRepository cashback, ICashbackEngine cashbackEngine, IUnitOfWork unitOfWork,
                               ICardLookupHasher lookupHasher, ISecretHasher secretHasher, ICurrentUser currentUser,
                               IValidator<SwipeRequest> swipeValidator, IValidator<LoadRequest> loadValidator)
     {
         _cards = cards;
         _transactions = transactions;
+        _cashback = cashback;
+        _cashbackEngine = cashbackEngine;
         _unitOfWork = unitOfWork;
         _lookupHasher = lookupHasher;
         _secretHasher = secretHasher;
@@ -94,14 +100,25 @@ public class TransactionService : ITransactionService
         var reason = card.GetSwipeDeclineReason(r.Amount);
         if (reason is not null) return await RecordDeclineAsync(card, r, reason, ct);
 
-        // 6. Approve: debit + ledger row, committed together.
+        // 6. Approve: debit + ledger row ...
         card.Debit(r.Amount);
         var txn = CardTransaction.ApprovedSwipe(card.CardId, r.MerchantName, r.MerchantCategoryCode, r.Amount);
         await _transactions.AddAsync(txn, ct);
+
+        // 7. ... + cashback (Module 3). All three are committed together by ONE SaveChanges:
+        //    a swipe can never be saved without its cashback, or cashback without its swipe.
+        var cashback = _cashbackEngine.Calculate(r.Amount, r.MerchantCategoryCode);
+        if (cashback.Amount > 0)
+        {
+            card.CreditReward(cashback.Amount);
+            await _cashback.AddAsync(CashbackLog.Earned(txn, cashback.Percentage, cashback.Amount), ct);
+        }
+
         await _unitOfWork.SaveChangesAsync(ct);
 
         return new SwipeResponse(true, nameof(TransactionStatus.Completed), null, txn.TransactionId,
-                                 card.MaskedCardNumber, r.Amount, card.AvailableBalance, DateTime.UtcNow);
+                                 card.MaskedCardNumber, r.Amount, card.AvailableBalance, DateTime.UtcNow,
+                                 cashback.Amount, cashback.Percentage);
     }
 
     /// <summary>Declined swipes are kept in the ledger: useful for the customer and for fraud monitoring.</summary>
@@ -149,6 +166,17 @@ public class TransactionService : ITransactionService
             var refund = original.Refund();   // original: Completed -> Refunded
             card.CreditRefund(original.Amount); // give the money back (may create a credit balance)
             await _transactions.AddAsync(refund, ct);
+
+            // Module 3: the purchase no longer exists, so neither does its cashback.
+            // The refund was credited first, so the balance always covers the reversal.
+            var logs = await _cashback.GetByTransactionIdsAsync(new[] { original.TransactionId }, ct);
+            var earned = logs.FirstOrDefault(l => l.CashbackType == CashbackType.Earned);
+            if (earned is not null && logs.All(l => l.CashbackType != CashbackType.Reversed))
+            {
+                card.ReverseReward(earned.CashbackAmount);
+                await _cashback.AddAsync(earned.CreateReversal(), ct);
+            }
+
             await _unitOfWork.SaveChangesAsync(ct);
 
             return new BalanceChangeResponse(ToDto(refund, card), card.ToDto());
@@ -179,7 +207,23 @@ public class TransactionService : ITransactionService
     {
         (page, pageSize) = PagedResult<TransactionDto>.Normalize(page, pageSize);
         var (items, total) = await _transactions.GetPagedAsync(cardId, page, pageSize, ct);
-        return new PagedResult<TransactionDto>(items.Select(t => ToDto(t, t.Card)).ToList(), page, pageSize, total);
+
+        // Annotate each swipe with its cashback (one extra query for the whole page, not one per row).
+        var cashback = (await _cashback.GetByTransactionIdsAsync(items.Select(t => t.TransactionId).ToList(), ct))
+                       .ToLookup(c => c.TransactionId);
+
+        var dtos = items.Select(t =>
+        {
+            var logs = cashback[t.TransactionId].ToList();
+            var earned = logs.FirstOrDefault(l => l.CashbackType == CashbackType.Earned);
+            return ToDto(t, t.Card) with
+            {
+                CashbackEarned = earned?.CashbackAmount,
+                CashbackReversed = logs.Any(l => l.CashbackType == CashbackType.Reversed)
+            };
+        }).ToList();
+
+        return new PagedResult<TransactionDto>(dtos, page, pageSize, total);
     }
 
     // ---- helpers -------------------------------------------------------------------------------
