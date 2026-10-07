@@ -1,0 +1,160 @@
+<a class="small" [routerLink]="['/cards', cardId(), 'transactions']">&larr; Back to statement</a>
+<div class="d-flex align-items-center mt-2 mb-4">
+  <h1 class="h3 mb-0 me-auto">EMI plans</h1>
+  <a class="btn btn-outline-primary btn-sm" routerLink="/emi-calculator">EMI calculator</a>
+</div>
+
+@if (message()) {
+  <div class="alert alert-success alert-dismissible">
+    {{ message() }}
+    <button type="button" class="btn-close" (click)="message.set(null)"></button>
+  </div>
+}
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+@if (summary(); as s) {
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">
+      <div class="small text-muted">Active plans</div><div class="fs-3 fw-semibold">{{ s.activePlans }}</div>
+    </div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">
+      <div class="small text-muted">Principal in EMI</div><div class="fs-3 fw-semibold">{{ s.outstandingPrincipal | currency: currency }}</div>
+    </div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">
+      <div class="small text-muted">Still to pay (incl. interest)</div><div class="fs-3 fw-semibold">{{ s.remainingBalance | currency: currency }}</div>
+    </div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">
+      <div class="small text-muted">Next due</div>
+      @if (s.nextDueDate) {
+        <div class="fs-5 fw-semibold">{{ s.nextDueAmount | currency: currency }}</div>
+        <div class="small">{{ s.nextDueDate | date: 'mediumDate' }}</div>
+      } @else {
+        <div class="fs-5 text-muted">–</div>
+      }
+    </div></div></div>
+  </div>
+}
+
+<!-- Purchases that can be converted -->
+<h2 class="h5">Convert a purchase to EMI</h2>
+@if (eligible().length === 0) {
+  <p class="text-muted small">No purchases can be converted right now. Purchases above ₹100 from the last 30 days that are not
+    refunded or already converted appear here.</p>
+} @else {
+  <div class="table-responsive mb-3">
+    <table class="table table-hover bg-white shadow-sm align-middle">
+      <thead class="table-light"><tr><th>Date</th><th>Merchant</th><th class="text-end">Amount</th><th>Convert before</th><th></th></tr></thead>
+      <tbody>
+        @for (t of eligible(); track t.transactionId) {
+          <tr [class.table-primary]="converting()?.transactionId === t.transactionId">
+            <td>{{ t.transactionDate | date: 'mediumDate' }}</td>
+            <td>{{ t.merchantName }} <span class="small text-muted">#{{ t.transactionId }}</span></td>
+            <td class="text-end fw-semibold">{{ t.amount | currency: currency }}</td>
+            <td class="small">{{ t.convertBeforeUtc | date: 'mediumDate' }}</td>
+            <td class="text-end"><button class="btn btn-sm btn-primary" (click)="startConvert(t)">Convert to EMI</button></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (converting(); as t) {
+  <div class="card shadow-sm border-primary mb-4">
+    <div class="card-body">
+      <h3 class="h6">Choose a tenure for {{ t.merchantName }} ({{ t.amount | currency: currency }})</h3>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-2">
+          <thead><tr><th></th><th>Tenure</th><th class="text-end">Interest p.a.</th><th class="text-end">Monthly EMI</th>
+                     <th class="text-end">Total interest</th><th class="text-end">Total to repay</th></tr></thead>
+          <tbody>
+            @for (o of options(); track o.tenureMonths) {
+              <tr (click)="selectedTenure.set(o.tenureMonths)" role="button">
+                <td><input class="form-check-input" type="radio" name="tenure" [checked]="selectedTenure() === o.tenureMonths"
+                           [attr.aria-label]="o.tenureMonths + ' months'"></td>
+                <td>{{ o.tenureMonths }} months</td>
+                <td class="text-end">{{ o.annualInterestRate }}%</td>
+                <td class="text-end fw-semibold">{{ o.monthlyInstallment | currency: currency }}</td>
+                <td class="text-end">{{ o.totalInterest | currency: currency }}</td>
+                <td class="text-end">{{ o.totalRepayable | currency: currency }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (selectedOption(); as o) {
+        <p class="small mb-2">You will pay <strong>{{ o.monthlyInstallment | currency: currency }}</strong> for
+          {{ o.tenureMonths }} months – {{ o.totalInterest | currency: currency }} interest in total. A converted purchase can no longer be refunded.</p>
+      }
+      <button class="btn btn-primary btn-sm me-2" [disabled]="!selectedTenure() || busy()" (click)="confirmConvert()">Confirm conversion</button>
+      <button class="btn btn-link btn-sm" (click)="converting.set(null)">Cancel</button>
+    </div>
+  </div>
+}
+
+<!-- Plans -->
+<h2 class="h5 mt-4">Your EMI plans</h2>
+@for (p of plans(); track p.emiPlanId) {
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <strong class="me-2">{{ p.merchantName }}</strong>
+        <span class="text-muted small">{{ p.principalAmount | currency: currency }} · {{ p.tenureMonths }} months · {{ p.annualInterestRate }}% p.a.</span>
+        <span class="badge ms-auto" [class]="p.planStatus === 'Active' ? 'bg-primary' : 'bg-secondary'">{{ p.planStatus }}</span>
+      </div>
+      <div class="progress mb-2" style="height: 8px" [attr.aria-label]="p.paidInstallments + ' of ' + p.tenureMonths + ' paid'">
+        <div class="progress-bar bg-success" [style.width.%]="(p.paidInstallments / p.tenureMonths) * 100"></div>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-3 small">
+        <span>{{ p.paidInstallments }} of {{ p.tenureMonths }} paid</span>
+        <span>EMI {{ p.monthlyInstallment | currency: currency }}</span>
+        <span>Remaining {{ p.remainingBalance | currency: currency }}</span>
+        <span class="text-muted">Total interest {{ p.totalInterest | currency: currency }}</span>
+        <span class="ms-auto d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" (click)="toggle(p.emiPlanId)">
+            {{ expandedPlan() === p.emiPlanId ? 'Hide schedule' : 'Show schedule' }}
+          </button>
+          @if (p.nextInstallment; as n) {
+            <button class="btn btn-sm" [class]="n.isOverdue ? 'btn-danger' : 'btn-success'" [disabled]="busy()" (click)="pay(p)">
+              Pay installment {{ n.installmentNumber }} · {{ n.amountDue | currency: currency }}
+              @if (n.isOverdue) { (overdue) }
+            </button>
+          }
+        </span>
+      </div>
+
+      @if (expandedPlan() === p.emiPlanId) {
+        <div class="table-responsive mt-3">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light"><tr><th>#</th><th>Due date</th><th class="text-end">Installment</th>
+              <th class="text-end">Principal</th><th class="text-end">Interest</th><th>Status</th></tr></thead>
+            <tbody>
+              @for (s of p.schedule; track s.installmentNumber) {
+                <tr [class.text-muted]="s.paymentStatus === 'Paid'">
+                  <td>{{ s.installmentNumber }}</td>
+                  <td>{{ s.dueDate | date: 'mediumDate' }}</td>
+                  <td class="text-end">{{ s.amountDue | currency: currency }}</td>
+                  <td class="text-end">{{ s.principalComponent | currency: currency }}</td>
+                  <td class="text-end">{{ s.interestComponent | currency: currency }}</td>
+                  <td>
+                    @if (s.paymentStatus === 'Paid') {
+                      <span class="badge bg-success">Paid {{ s.paidDate | date: 'shortDate' }}</span>
+                    } @else if (s.isOverdue) {
+                      <span class="badge bg-danger">Overdue</span>
+                    } @else {
+                      <span class="badge bg-light text-dark">Pending</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+} @empty {
+  <p class="text-muted small">No EMI plans yet.</p>
+}

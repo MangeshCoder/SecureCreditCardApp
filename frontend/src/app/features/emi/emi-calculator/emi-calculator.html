@@ -1,0 +1,86 @@
+<h1 class="h3 mb-1">EMI calculator</h1>
+<p class="text-muted mb-4">See what a purchase costs in monthly installments. Interest rates are set by the bank per tenure.</p>
+
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form class="row g-2 align-items-end" [formGroup]="form" (ngSubmit)="calculate()" novalidate>
+      <div class="col-sm-5">
+        <label class="form-label" for="amount">Amount ({{ currency }})</label>
+        <input id="amount" type="number" class="form-control" formControlName="amount"
+               [class.is-invalid]="form.controls.amount.touched && form.controls.amount.invalid">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label" for="tenure">Tenure</label>
+        <select id="tenure" class="form-select" formControlName="tenureMonths">
+          @for (o of options(); track o.tenureMonths) {
+            <option [ngValue]="o.tenureMonths">{{ o.tenureMonths }} months ({{ o.annualInterestRate }}% p.a.)</option>
+          } @empty {
+            <option [ngValue]="12">12 months</option>
+          }
+        </select>
+      </div>
+      <div class="col-sm-3">
+        <button class="btn btn-primary w-100" type="submit">Calculate</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+@if (options().length) {
+  <h2 class="h5">Compare tenures</h2>
+  <div class="table-responsive mb-4">
+    <table class="table table-hover bg-white shadow-sm align-middle">
+      <thead class="table-light">
+        <tr><th>Tenure</th><th class="text-end">Interest p.a.</th><th class="text-end">Monthly EMI</th>
+            <th class="text-end">Total interest</th><th class="text-end">Total to repay</th><th></th></tr>
+      </thead>
+      <tbody>
+        @for (o of options(); track o.tenureMonths) {
+          <tr [class.table-primary]="o.tenureMonths === calculation()?.tenureMonths">
+            <td>{{ o.tenureMonths }} months</td>
+            <td class="text-end">{{ o.annualInterestRate }}%</td>
+            <td class="text-end fw-semibold">{{ o.monthlyInstallment | currency: currency }}</td>
+            <td class="text-end">{{ o.totalInterest | currency: currency }}</td>
+            <td class="text-end">{{ o.totalRepayable | currency: currency }}</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-primary" (click)="choose(o.tenureMonths)">Schedule</button></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (calculation(); as c) {
+  <h2 class="h5">Amortization schedule – {{ c.tenureMonths }} months at {{ c.annualInterestRate }}%</h2>
+  <p class="small text-muted">
+    Each month you pay {{ c.monthlyInstallment | currency: currency }}. Early installments are mostly interest;
+    as the balance falls, more of each payment repays the principal.
+  </p>
+  <div class="table-responsive">
+    <table class="table table-sm bg-white shadow-sm align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Due date</th><th class="text-end">Installment</th><th class="text-end">Principal</th><th class="text-end">Interest</th></tr>
+      </thead>
+      <tbody>
+        @for (s of c.schedule; track s.installmentNumber) {
+          <tr>
+            <td>{{ s.installmentNumber }}</td>
+            <td>{{ s.dueDate | date: 'mediumDate' }}</td>
+            <td class="text-end">{{ s.amountDue | currency: currency }}</td>
+            <td class="text-end">{{ s.principalComponent | currency: currency }}</td>
+            <td class="text-end text-muted">{{ s.interestComponent | currency: currency }}</td>
+          </tr>
+        }
+      </tbody>
+      <tfoot class="fw-semibold">
+        <tr><td colspan="2">Total</td><td class="text-end">{{ c.totalRepayable | currency: currency }}</td>
+            <td class="text-end">{{ c.principalAmount | currency: currency }}</td>
+            <td class="text-end">{{ c.totalInterest | currency: currency }}</td></tr>
+      </tfoot>
+    </table>
+  </div>
+}

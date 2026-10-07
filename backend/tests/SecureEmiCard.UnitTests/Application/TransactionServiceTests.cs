@@ -53,7 +53,7 @@ public class TransactionServiceTests
 
         _sut = new TransactionService(
             new CreditCardRepository(_db), new TransactionRepository(_db),
-            new CashbackRepository(_db), new CashbackEngine(Options.Create(new CashbackOptions())), _db,
+            new CashbackRepository(_db), new CashbackEngine(Options.Create(new CashbackOptions())), new EmiPlanRepository(_db), _db,
             lookup, hasher, _user,
             new SwipeRequestValidator(), new LoadRequestValidator());
     }

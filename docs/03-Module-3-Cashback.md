@@ -356,6 +356,8 @@ dotnet test
 
 ## What's next – Module 4
 
+[Module 4 guide →](04-Module-4-Emi.md)
+
 **EMI Conversion Engine:** the `EmiPlans` and `EmiSchedules` tables, an EMI **preview calculator**
 (the reducing-balance formula `EMI = P·r·(1+r)ⁿ / ((1+r)ⁿ − 1)`), converting an eligible purchase
 (above ₹100, not refunded, not already converted) into a 3/6/12/24-month plan, the full amortization

@@ -63,6 +63,7 @@
               <button class="btn btn-outline-secondary btn-sm" (click)="open(card.cardId, 'pin')">Change PIN</button>
               <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', card.cardId, 'transactions']">Statement / Pay bill</a>
               <a class="btn btn-outline-success btn-sm" [routerLink]="['/cards', card.cardId, 'rewards']">Rewards</a>
+              <a class="btn btn-outline-primary btn-sm" [routerLink]="['/cards', card.cardId, 'emi']">EMI</a>
               <button class="btn btn-outline-danger btn-sm ms-auto" (click)="block(card)">Block card</button>
             </div>
           } @else {

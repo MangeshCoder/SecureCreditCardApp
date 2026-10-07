@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Common.Exceptions;
@@ -18,6 +19,8 @@ public class AppDbContext : DbContext, IUnitOfWork
     public DbSet<CreditCard> CreditCards => Set<CreditCard>();
     public DbSet<CardTransaction> Transactions => Set<CardTransaction>();
     public DbSet<CashbackLog> CashbackLogs => Set<CashbackLog>();
+    public DbSet<EmiPlan> EmiPlans => Set<EmiPlan>();
+    public DbSet<EmiSchedule> EmiSchedules => Set<EmiSchedule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +37,12 @@ public class AppDbContext : DbContext, IUnitOfWork
         catch (DbUpdateConcurrencyException ex)
         {
             throw new ConcurrencyConflictException("The record was modified by another request. Please retry.", ex);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            // 2601/2627 = unique index / unique constraint violation, e.g. two requests converting the
+            // same purchase to EMI at the same moment (UQ_EmiPlans_TransactionId). Answer 409, not 500.
+            throw new ConflictException("This operation was already completed by another request.");
         }
     }
 

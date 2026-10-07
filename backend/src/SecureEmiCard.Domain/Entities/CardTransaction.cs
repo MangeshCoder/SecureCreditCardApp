@@ -56,6 +56,31 @@ public class CardTransaction
         new(cardId, "Card repayment", MerchantCategoryCodes.FinancialInstitution, amount,
             TransactionType.Load, TransactionStatus.Completed, null);
 
+    /// <summary>Ledger row for paying one EMI installment (principal + interest).</summary>
+    public static CardTransaction EmiInstallment(int cardId, string description, decimal amount) =>
+        new(cardId, description.Length > MaxMerchantNameLength ? description[..MaxMerchantNameLength] : description,
+            MerchantCategoryCodes.FinancialInstitution, amount, TransactionType.EmiInstallment, TransactionStatus.Completed, null);
+
+    /// <summary>Returns why this transaction cannot be converted to EMI, or null if it can.</summary>
+    public string? GetEmiIneligibilityReason(decimal minimumAmount, int conversionWindowDays, DateTime nowUtc)
+    {
+        if (TransactionType != TransactionType.Swipe) return "Only purchases can be converted to EMI.";
+        if (TransactionStatus == TransactionStatus.Refunded) return "A refunded purchase cannot be converted to EMI.";
+        if (TransactionStatus != TransactionStatus.Completed) return "Only approved purchases can be converted to EMI.";
+        if (IsEmiConverted) return "This purchase is already converted to EMI.";
+        if (Amount <= minimumAmount) return $"Only purchases above {minimumAmount:0.00} can be converted to EMI.";
+        if (TransactionDate < nowUtc.AddDays(-conversionWindowDays))
+            return $"Purchases can be converted to EMI only within {conversionWindowDays} days.";
+        return null;
+    }
+
+    public void MarkEmiConverted(decimal minimumAmount, int conversionWindowDays, DateTime nowUtc)
+    {
+        var reason = GetEmiIneligibilityReason(minimumAmount, conversionWindowDays, nowUtc);
+        if (reason is not null) throw new DomainException(reason);
+        IsEmiConverted = true;
+    }
+
     /// <summary>Marks this swipe as refunded and returns the matching Refund ledger row.</summary>
     public CardTransaction Refund()
     {

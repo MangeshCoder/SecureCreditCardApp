@@ -37,6 +37,7 @@
             } @else {
               <a class="btn btn-sm btn-outline-dark me-1" [routerLink]="['/cards', card.cardId, 'transactions']">Statement</a>
               <a class="btn btn-sm btn-outline-success me-1" [routerLink]="['/cards', card.cardId, 'rewards']">Rewards</a>
+              <a class="btn btn-sm btn-outline-primary me-1" [routerLink]="['/cards', card.cardId, 'emi']">EMI</a>
               <button class="btn btn-sm btn-outline-primary me-1" (click)="editLimit(card)">Change limit</button>
               @if (card.cardStatus === 'Active') {
                 <button class="btn btn-sm btn-outline-danger" (click)="block(card)">Block</button>

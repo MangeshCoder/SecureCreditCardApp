@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Features.Cashback;
+using SecureEmiCard.Application.Features.Emi;
+using SecureEmiCard.Domain.Entities;
 using SecureEmiCard.Infrastructure.Persistence;
 using SecureEmiCard.Infrastructure.Persistence.Repositories;
 using SecureEmiCard.Infrastructure.Security;
@@ -30,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<ICreditCardRepository, CreditCardRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ICashbackRepository, CashbackRepository>();
+        services.AddScoped<IEmiPlanRepository, EmiPlanRepository>();
 
         // ---- Cashback rules (Module 3) ----------------------------------------------------
         // Defaults live in CashbackOptions; the optional "Cashback" config section overrides them.
@@ -39,6 +42,16 @@ public static class DependencyInjection
             .Validate(o => o.CategoryPercentages.Values.All(p => p is >= 0 and <= 100), "Cashback:CategoryPercentages must be between 0 and 100.")
             .Validate(o => o.CategoryPercentages.Keys.All(k => k.Length == 4 && k.All(char.IsAsciiDigit)), "Cashback:CategoryPercentages keys must be 4-digit MCCs.")
             .Validate(o => o.MinimumSpend >= 0 && o.MaxCashbackPerTransaction > 0, "Cashback:MinimumSpend must be >= 0 and MaxCashbackPerTransaction > 0.")
+            .ValidateOnStart();
+
+        // ---- EMI rules (Module 4) ------------------------------------------------------------
+        services.AddOptions<EmiOptions>()
+            .Bind(configuration.GetSection(EmiOptions.SectionName))
+            .Validate(o => o.MinimumAmount >= 0, "Emi:MinimumAmount must be >= 0.")
+            .Validate(o => o.ConversionWindowDays > 0, "Emi:ConversionWindowDays must be > 0.")
+            .Validate(o => o.AnnualInterestRates.Count > 0 && o.AnnualInterestRates.Keys.All(t => EmiPlan.AllowedTenures.Contains(t)),
+                      "Emi:AnnualInterestRates keys must be tenures from: 3, 6, 12, 24.")
+            .Validate(o => o.AnnualInterestRates.Values.All(r => r is >= 0 and <= 60), "Emi:AnnualInterestRates must be between 0 and 60.")
             .ValidateOnStart();
 
         // ---- Security --------------------------------------------------------------

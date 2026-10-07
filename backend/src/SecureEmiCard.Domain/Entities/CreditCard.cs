@@ -173,6 +173,18 @@ public class CreditCard
         AvailableBalance -= amount;
     }
 
+    // ---- Module 4: EMI ------------------------------------------------------------------
+
+    /// <summary>
+    /// Paying an installment frees its principal part of the credit limit again.
+    /// (The interest part is the bank's charge - it does not change the available balance.)
+    /// </summary>
+    public void ReleaseEmiPrincipal(decimal principal)
+    {
+        if (principal < 0) throw new DomainException("Principal cannot be negative.");
+        AvailableBalance += principal;
+    }
+
     // ---- Module 2: PIN lockout ----------------------------------------------------------
 
     public int RemainingPinAttempts => Math.Max(0, MaxFailedPinAttempts - FailedPinAttempts);

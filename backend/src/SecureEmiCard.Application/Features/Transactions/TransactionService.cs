@@ -1,6 +1,7 @@
 using FluentValidation;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
+using SecureEmiCard.Application.Common;
 using SecureEmiCard.Application.Common.Exceptions;
 using SecureEmiCard.Application.Common.Models;
 using SecureEmiCard.Application.Features.Cashback;
@@ -34,12 +35,11 @@ public interface ITransactionService
 /// </summary>
 public class TransactionService : ITransactionService
 {
-    private const int MaxConcurrencyRetries = 3;
-
     private readonly ICreditCardRepository _cards;
     private readonly ITransactionRepository _transactions;
     private readonly ICashbackRepository _cashback;
     private readonly ICashbackEngine _cashbackEngine;
+    private readonly IEmiPlanRepository _emiPlans;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICardLookupHasher _lookupHasher;
     private readonly ISecretHasher _secretHasher;
@@ -48,7 +48,8 @@ public class TransactionService : ITransactionService
     private readonly IValidator<LoadRequest> _loadValidator;
 
     public TransactionService(ICreditCardRepository cards, ITransactionRepository transactions,
-                              ICashbackRepository cashback, ICashbackEngine cashbackEngine, IUnitOfWork unitOfWork,
+                              ICashbackRepository cashback, ICashbackEngine cashbackEngine,
+                              IEmiPlanRepository emiPlans, IUnitOfWork unitOfWork,
                               ICardLookupHasher lookupHasher, ISecretHasher secretHasher, ICurrentUser currentUser,
                               IValidator<SwipeRequest> swipeValidator, IValidator<LoadRequest> loadValidator)
     {
@@ -56,6 +57,7 @@ public class TransactionService : ITransactionService
         _transactions = transactions;
         _cashback = cashback;
         _cashbackEngine = cashbackEngine;
+        _emiPlans = emiPlans;
         _unitOfWork = unitOfWork;
         _lookupHasher = lookupHasher;
         _secretHasher = secretHasher;
@@ -141,6 +143,14 @@ public class TransactionService : ITransactionService
         return await WithConcurrencyRetryAsync(async () =>
         {
             var card = await GetAccessibleCardAsync(request.CardId, ct);
+
+            // Module 4: the part of the bill being repaid through EMI installments cannot be paid here.
+            var inEmi = await _emiPlans.GetOutstandingPrincipalAsync(card.CardId, ct);
+            var payableNow = Math.Max(0, card.OutstandingAmount - inEmi);
+            if (inEmi > 0 && request.Amount > payableNow)
+                throw new DomainException(
+                    $"You can pay at most {payableNow:0.00} now. {inEmi:0.00} is being repaid through EMI installments.");
+
             card.Credit(request.Amount);
 
             var txn = CardTransaction.Load(card.CardId, request.Amount);
@@ -228,24 +238,8 @@ public class TransactionService : ITransactionService
 
     // ---- helpers -------------------------------------------------------------------------------
 
-    /// <summary>
-    /// Runs an operation and, if another request changed the same card in the meantime,
-    /// discards the stale data and runs it again (up to 3 times).
-    /// </summary>
-    private async Task<T> WithConcurrencyRetryAsync<T>(Func<Task<T>> operation)
-    {
-        for (int attempt = 1; ; attempt++)
-        {
-            try
-            {
-                return await operation();
-            }
-            catch (ConcurrencyConflictException) when (attempt < MaxConcurrencyRetries)
-            {
-                _unitOfWork.ClearChanges();
-            }
-        }
-    }
+    private Task<T> WithConcurrencyRetryAsync<T>(Func<Task<T>> operation) =>
+        _unitOfWork.WithConcurrencyRetryAsync(operation);
 
     private void EnsureAdmin()
     {

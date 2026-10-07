@@ -50,7 +50,7 @@ public class CashbackFlowTests
             new IssueCardRequestValidator(), new UpdateCreditLimitRequestValidator(),
             new ChangePinRequestValidator(), new RevealCardNumberRequestValidator());
         _transactions = new TransactionService(new CreditCardRepository(_db), new TransactionRepository(_db),
-            new CashbackRepository(_db), engine, _db, lookup, hasher, _user,
+            new CashbackRepository(_db), engine, new EmiPlanRepository(_db), _db, lookup, hasher, _user,
             new SwipeRequestValidator(), new LoadRequestValidator());
         _sut = new CashbackService(engine, new CashbackRepository(_db), new CreditCardRepository(_db), _user);
     }

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Domain.Entities;
+using SecureEmiCard.Domain.Enums;
 
 namespace SecureEmiCard.Infrastructure.Persistence.Repositories;
 
@@ -28,6 +29,16 @@ public class TransactionRepository : ITransactionRepository
                                .ToListAsync(ct);
         return (items, total);
     }
+
+    public async Task<IReadOnlyList<CardTransaction>> GetConvertibleSwipesAsync(int cardId, DateTime sinceUtc, CancellationToken ct = default) =>
+        await _db.Transactions.AsNoTracking()
+                 .Where(t => t.CardId == cardId
+                             && t.TransactionType == TransactionType.Swipe
+                             && t.TransactionStatus == TransactionStatus.Completed
+                             && !t.IsEmiConverted
+                             && t.TransactionDate >= sinceUtc)
+                 .OrderByDescending(t => t.TransactionDate)
+                 .ToListAsync(ct);
 
     public async Task AddAsync(CardTransaction transaction, CancellationToken ct = default) =>
         await _db.Transactions.AddAsync(transaction, ct);

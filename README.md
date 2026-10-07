@@ -33,8 +33,8 @@ SecureCreditCardApp/
 | 1 | [Foundation + Cardholder & Card Lifecycle Management](docs/01-Module-1-Cardholders-and-Cards.md) | ✅ Done |
 | 2 | [Merchant Swipe & Load Operations (transactions ledger)](docs/02-Module-2-Swipe-and-Load.md) | ✅ Done |
 | 3 | [Automated Cashback Reward Engine](docs/03-Module-3-Cashback.md) | ✅ Done |
-| 4 | EMI Conversion Engine (amortization + schedules) | ⏳ Next |
-| 5 | Inter-Bank Payload Security (AES payload encryption + HMAC signatures + audit log) | ⏳ |
+| 4 | [EMI Conversion Engine (amortization + schedules)](docs/04-Module-4-Emi.md) | ✅ Done |
+| 5 | Inter-Bank Payload Security (AES payload encryption + HMAC signatures + audit log) | ⏳ Next |
 | 6 | Deployment (Docker, Azure App Service, Key Vault, CI/CD) | ⏳ |
 
 See [docs/00-Roadmap.md](docs/00-Roadmap.md) for the full plan.
@@ -48,6 +48,7 @@ See [docs/00-Roadmap.md](docs/00-Roadmap.md) for the full plan.
 sqlcmd -S localhost -E -i database/01a_Database_Schema_Core_Tables.sql
 sqlcmd -S localhost -E -i database/02_Module2_Transactions.sql
 sqlcmd -S localhost -E -i database/03_Module3_Cashback.sql
+sqlcmd -S localhost -E -i database/04_Module4_Emi.sql
 
 # 2. API  -> http://localhost:5080/swagger
 cd backend

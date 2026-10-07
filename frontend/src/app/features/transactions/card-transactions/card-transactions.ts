@@ -7,6 +7,8 @@ import { Card } from '../../../core/models/card.models';
 import { PagedResult, Transaction } from '../../../core/models/transaction.models';
 import { AuthService } from '../../../core/services/auth.service';
 import { CardService } from '../../../core/services/card.service';
+import { EmiService } from '../../../core/services/emi.service';
+import { CardEmiSummary } from '../../../core/models/emi.models';
 import { TransactionService } from '../../../core/services/transaction.service';
 import { apiErrorMessages } from '../../../core/utils/api-error';
 import { signedAmount, statusBadge } from '../transaction-badges';
@@ -23,6 +25,7 @@ export class CardTransactions implements OnInit {
 
   private readonly cards = inject(CardService);
   private readonly transactions = inject(TransactionService);
+  private readonly emi = inject(EmiService);
   protected readonly auth = inject(AuthService);
 
   protected readonly currency = environment.currencyCode;
@@ -33,16 +36,16 @@ export class CardTransactions implements OnInit {
   protected readonly ledger = signal<PagedResult<Transaction> | null>(null);
   protected readonly errors = signal<string[]>([]);
   protected readonly message = signal<string | null>(null);
+  /** Module 4: how much of the bill is repaid through EMI installments (cannot be paid via "Pay bill"). */
+  protected readonly emiSummary = signal<CardEmiSummary | null>(null);
   protected payAmount = 0;
 
   ngOnInit(): void {
     this.cards.getCard(this.id).subscribe({
-      next: c => {
-        this.card.set(c);
-        this.payAmount = Math.max(0, c.outstandingAmount);
-      },
+      next: c => this.card.set(c),
       error: e => this.errors.set(apiErrorMessages(e))
     });
+    this.loadEmiSummary();
     this.loadPage(1);
   }
 
@@ -59,9 +62,24 @@ export class CardTransactions implements OnInit {
     this.transactions.load(this.id, this.payAmount).subscribe({
       next: r => {
         this.card.set(r.card);
-        this.payAmount = Math.max(0, r.card.outstandingAmount);
+        this.loadEmiSummary();
         this.message.set(`Payment of ${r.transaction.amount} received. Thank you!`);
         this.loadPage(1);
+      },
+      error: e => this.errors.set(apiErrorMessages(e))
+    });
+  }
+
+  /** Amount "Pay bill" accepts: what is owed minus what is being repaid in EMIs. */
+  payableNow(): number {
+    return this.emiSummary()?.payableOutsideEmi ?? Math.max(0, this.card()?.outstandingAmount ?? 0);
+  }
+
+  private loadEmiSummary(): void {
+    this.emi.getSummary(this.id).subscribe({
+      next: s => {
+        this.emiSummary.set(s);
+        this.payAmount = s.payableOutsideEmi;
       },
       error: e => this.errors.set(apiErrorMessages(e))
     });

@@ -31,6 +31,16 @@ export const routes: Routes = [
     loadComponent: () => import('./features/cashback/card-rewards/card-rewards').then(m => m.CardRewards)
   },
   {
+    path: 'cards/:cardId/emi',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/emi/card-emi/card-emi').then(m => m.CardEmi)
+  },
+  {
+    path: 'emi-calculator',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/emi/emi-calculator/emi-calculator').then(m => m.EmiCalculator)
+  },
+  {
     path: 'pay',
     canActivate: [authGuard],
     loadComponent: () => import('./features/transactions/checkout/checkout').then(m => m.Checkout)

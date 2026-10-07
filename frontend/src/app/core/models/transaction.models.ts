@@ -1,6 +1,6 @@
 import { Card } from './card.models';
 
-export type TransactionType = 'Swipe' | 'Load' | 'Refund';
+export type TransactionType = 'Swipe' | 'Load' | 'Refund' | 'EmiInstallment';
 export type TransactionStatus = 'Completed' | 'Declined' | 'Refunded';
 
 export interface SwipeRequest {

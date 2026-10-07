@@ -8,5 +8,7 @@ public enum TransactionType
     /// <summary>Repayment / balance load by the cardholder - increases the available balance.</summary>
     Load,
     /// <summary>Merchant refund of an earlier swipe - increases the available balance.</summary>
-    Refund
+    Refund,
+    /// <summary>Payment of one EMI installment (Module 4) - frees the principal part of the credit limit.</summary>
+    EmiInstallment
 }

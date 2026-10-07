@@ -1,6 +1,7 @@
 <a class="small" [routerLink]="auth.isAdmin() ? '/admin/cards' : '/cards'">&larr; Back to cards</a>
 <div class="d-flex align-items-center mt-2 mb-4">
   <h1 class="h3 mb-0 me-auto">Card statement</h1>
+  <a class="btn btn-outline-primary btn-sm me-2" [routerLink]="['/cards', cardId(), 'emi']">EMI plans</a>
   <a class="btn btn-outline-success btn-sm" [routerLink]="['/cards', cardId(), 'rewards']">Cashback rewards</a>
 </div>
 
@@ -40,13 +41,18 @@
           }
         </div>
         <div class="col-md-3">
-          @if (c.outstandingAmount > 0) {
+          @if (payableNow() > 0) {
             <form class="input-group input-group-sm" (ngSubmit)="payBill()">
-              <input type="number" class="form-control" name="amount" [(ngModel)]="payAmount" min="0.01" [max]="c.outstandingAmount">
+              <input type="number" class="form-control" name="amount" [(ngModel)]="payAmount" min="0.01" [max]="payableNow()">
               <button class="btn btn-primary" type="submit">Pay bill</button>
             </form>
           } @else {
-            <span class="text-muted small">Nothing to pay.</span>
+            <span class="text-muted small">Nothing to pay outside EMIs.</span>
+          }
+          @if (emiSummary()?.outstandingPrincipal; as inEmi) {
+            <div class="small text-muted mt-1">
+              {{ inEmi | currency: currency }} is repaid through <a [routerLink]="['/cards', cardId(), 'emi']">EMI installments</a>.
+            </div>
           }
         </div>
       </div>
@@ -78,7 +84,10 @@
                 </div>
               }
             </td>
-            <td>{{ t.transactionType }}</td>
+            <td>
+              {{ t.transactionType === 'EmiInstallment' ? 'EMI payment' : t.transactionType }}
+              @if (t.isEmiConverted) { <span class="badge bg-primary ms-1">EMI</span> }
+            </td>
             <td><span class="badge" [class]="statusBadge(t)">{{ t.transactionStatus }}</span></td>
             <td class="text-end fw-semibold" [class.text-success]="signedAmount(t) > 0">
               @if (t.transactionStatus === 'Declined') {
