@@ -9,6 +9,8 @@ using SecureEmiCard.Domain.Entities;
 using SecureEmiCard.Infrastructure.Persistence;
 using SecureEmiCard.Infrastructure.Persistence.Repositories;
 using SecureEmiCard.Infrastructure.Security;
+using SecureEmiCard.Application.Abstractions.Auditing;
+using SecureEmiCard.Infrastructure.Auditing;
 
 namespace SecureEmiCard.Infrastructure;
 
@@ -22,7 +24,7 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options =>
         {
             if (useInMemory)
-                options.UseInMemoryDatabase("SecureEmiCardDb");
+                options.UseInMemoryDatabase(configuration["Database:InMemoryName"] ?? "SecureEmiCardDb");
             else
                 options.UseSqlServer(configuration.GetConnectionString("SecureEmiCardDb"),
                     sql => sql.EnableRetryOnFailure());
@@ -33,6 +35,8 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ICashbackRepository, CashbackRepository>();
         services.AddScoped<IEmiPlanRepository, EmiPlanRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddSingleton<IAuditLogWriter, AuditLogWriter>();
 
         // ---- Cashback rules (Module 3) ----------------------------------------------------
         // Defaults live in CashbackOptions; the optional "Cashback" config section overrides them.
@@ -73,6 +77,8 @@ public static class DependencyInjection
         services.AddSingleton<ICardLookupHasher, HmacCardLookupHasher>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddSingleton<IPayloadCryptoService, AesCbcPayloadCryptoService>();
+        services.AddSingleton<ISignatureService, HmacSignatureService>();
 
         return services;
     }

@@ -21,6 +21,7 @@ public class AppDbContext : DbContext, IUnitOfWork
     public DbSet<CashbackLog> CashbackLogs => Set<CashbackLog>();
     public DbSet<EmiPlan> EmiPlans => Set<EmiPlan>();
     public DbSet<EmiSchedule> EmiSchedules => Set<EmiSchedule>();
+    public DbSet<SecurityAuditLog> SecurityAuditLogs => Set<SecurityAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
