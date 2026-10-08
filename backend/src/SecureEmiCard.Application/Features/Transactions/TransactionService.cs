@@ -15,6 +15,13 @@ namespace SecureEmiCard.Application.Features.Transactions;
 public interface ITransactionService
 {
     Task<SwipeResponse> SwipeAsync(SwipeRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Module 5: authorization requested by a verified partner bank through the signed, encrypted gateway.
+    /// The partner may present any card (it is the merchant's bank), and its request signature is stored
+    /// on the ledger row (Transactions.DigitalSignature).
+    /// </summary>
+    Task<SwipeResponse> AuthorizeFromGatewayAsync(SwipeRequest request, string partnerSignature, CancellationToken ct = default);
     Task<BalanceChangeResponse> LoadAsync(LoadRequest request, CancellationToken ct = default);
     Task<BalanceChangeResponse> RefundAsync(int transactionId, CancellationToken ct = default);
     Task<PagedResult<TransactionDto>> GetCardTransactionsAsync(int cardId, int page, int pageSize, CancellationToken ct = default);
@@ -71,40 +78,55 @@ public class TransactionService : ITransactionService
     public async Task<SwipeResponse> SwipeAsync(SwipeRequest request, CancellationToken ct = default)
     {
         await _swipeValidator.ValidateAndThrowAsync(request, ct);
-        return await WithConcurrencyRetryAsync(() => AuthorizeAsync(request, ct));
+        return await WithConcurrencyRetryAsync(() => AuthorizeAsync(request, SwipeChannel.Simulator, ct));
     }
 
-    private async Task<SwipeResponse> AuthorizeAsync(SwipeRequest r, CancellationToken ct)
+    public async Task<SwipeResponse> AuthorizeFromGatewayAsync(SwipeRequest request, string partnerSignature, CancellationToken ct = default)
+    {
+        await _swipeValidator.ValidateAndThrowAsync(request, ct);
+        return await WithConcurrencyRetryAsync(() => AuthorizeAsync(request, SwipeChannel.Gateway(partnerSignature), ct));
+    }
+
+    /// <summary>Where a swipe comes from: the in-app simulator (JWT user) or a verified partner bank.</summary>
+    private sealed record SwipeChannel(bool AnyCard, string? PartnerSignature)
+    {
+        public static readonly SwipeChannel Simulator = new(false, null);
+        public static SwipeChannel Gateway(string signature) => new(true, signature);
+    }
+
+    private async Task<SwipeResponse> AuthorizeAsync(SwipeRequest r, SwipeChannel channel, CancellationToken ct)
     {
         // 1. Find the card through the blind index - the number itself is never searched or logged.
         var card = await _cards.GetByNumberHashAsync(_lookupHasher.Compute(r.CardNumber), ct);
 
-        // Cardholders use the simulator with their own cards only; admins act as the merchant terminal.
-        // An unknown or foreign card cannot be linked to a ledger row, so nothing is recorded.
-        if (card is null || (!_currentUser.IsAdmin && card.CardholderId != _currentUser.UserId))
+        // Cardholders use the simulator with their own cards only; admins and verified partner banks act as
+        // the merchant terminal. An unknown or foreign card cannot be linked to a ledger row, so nothing is recorded.
+        // (AnyCard is checked first: a gateway call has no logged-in user, so UserId must not be read.)
+        if (card is null || (!channel.AnyCard && !_currentUser.IsAdmin && card.CardholderId != _currentUser.UserId))
             return Declined(null, null, r.Amount, DeclineReasons.InvalidCardDetails);
 
         // 2. Card-not-present data: expiry date and CVV. Same generic reason for both on purpose.
         bool expiryMatches = card.ExpiryDate.Month == r.ExpiryMonth && card.ExpiryDate.Year == r.ExpiryYear;
         if (!expiryMatches || !_secretHasher.Verify(r.Cvv, card.CvvHash))
-            return await RecordDeclineAsync(card, r, DeclineReasons.InvalidCardDetails, ct);
+            return await RecordDeclineAsync(card, r, channel, DeclineReasons.InvalidCardDetails, ct);
 
         // 3. Card state. Checked before the PIN so a blocked card cannot be used to guess PINs.
-        if (!card.IsActive) return await RecordDeclineAsync(card, r, DeclineReasons.CardBlocked, ct);
-        if (card.IsExpired) return await RecordDeclineAsync(card, r, DeclineReasons.CardExpired, ct);
+        if (!card.IsActive) return await RecordDeclineAsync(card, r, channel, DeclineReasons.CardBlocked, ct);
+        if (card.IsExpired) return await RecordDeclineAsync(card, r, channel, DeclineReasons.CardExpired, ct);
 
         // 4. PIN with 3-strikes lockout.
         var pin = PinCheck.Verify(_secretHasher, card, r.Pin);
-        if (pin == PinCheckResult.LockedOut) return await RecordDeclineAsync(card, r, DeclineReasons.PinTriesExceeded, ct);
-        if (pin == PinCheckResult.Invalid) return await RecordDeclineAsync(card, r, DeclineReasons.IncorrectPin, ct);
+        if (pin == PinCheckResult.LockedOut) return await RecordDeclineAsync(card, r, channel, DeclineReasons.PinTriesExceeded, ct);
+        if (pin == PinCheckResult.Invalid) return await RecordDeclineAsync(card, r, channel, DeclineReasons.IncorrectPin, ct);
 
         // 5. Funds.
         var reason = card.GetSwipeDeclineReason(r.Amount);
-        if (reason is not null) return await RecordDeclineAsync(card, r, reason, ct);
+        if (reason is not null) return await RecordDeclineAsync(card, r, channel, reason, ct);
 
         // 6. Approve: debit + ledger row ...
         card.Debit(r.Amount);
         var txn = CardTransaction.ApprovedSwipe(card.CardId, r.MerchantName, r.MerchantCategoryCode, r.Amount);
+        if (channel.PartnerSignature is not null) txn.AttachDigitalSignature(channel.PartnerSignature);
         await _transactions.AddAsync(txn, ct);
 
         // 7. ... + cashback (Module 3). All three are committed together by ONE SaveChanges:
@@ -124,9 +146,10 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>Declined swipes are kept in the ledger: useful for the customer and for fraud monitoring.</summary>
-    private async Task<SwipeResponse> RecordDeclineAsync(CreditCard card, SwipeRequest r, string reason, CancellationToken ct)
+    private async Task<SwipeResponse> RecordDeclineAsync(CreditCard card, SwipeRequest r, SwipeChannel channel, string reason, CancellationToken ct)
     {
         var txn = CardTransaction.DeclinedSwipe(card.CardId, r.MerchantName, r.MerchantCategoryCode, r.Amount, reason);
+        if (channel.PartnerSignature is not null) txn.AttachDigitalSignature(channel.PartnerSignature);
         await _transactions.AddAsync(txn, ct);
         await _unitOfWork.SaveChangesAsync(ct); // also persists the PIN attempt counter
         return Declined(txn.TransactionId, card.MaskedCardNumber, r.Amount, reason);
