@@ -56,6 +56,17 @@ public class CardTransaction
         new(cardId, "Card repayment", MerchantCategoryCodes.FinancialInstitution, amount,
             TransactionType.Load, TransactionStatus.Completed, null);
 
+    /// <summary>
+    /// Stores the partner bank's HMAC signature of the request that created this transaction
+    /// (spec: Transactions.DigitalSignature). Proof that the partner really sent it - non-repudiation.
+    /// </summary>
+    public void AttachDigitalSignature(string signature)
+    {
+        if (string.IsNullOrWhiteSpace(signature)) throw new DomainException("Signature is required.");
+        if (DigitalSignature is not null) throw new DomainException("A digital signature is already attached.");
+        DigitalSignature = signature.Length > 512 ? signature[..512] : signature;
+    }
+
     /// <summary>Ledger row for paying one EMI installment (principal + interest).</summary>
     public static CardTransaction EmiInstallment(int cardId, string description, decimal amount) =>
         new(cardId, description.Length > MaxMerchantNameLength ? description[..MaxMerchantNameLength] : description,

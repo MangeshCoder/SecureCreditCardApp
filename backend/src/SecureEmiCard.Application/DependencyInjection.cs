@@ -6,6 +6,7 @@ using SecureEmiCard.Application.Features.Emi;
 using SecureEmiCard.Application.Features.Cardholders;
 using SecureEmiCard.Application.Features.Cards;
 using SecureEmiCard.Application.Features.Transactions;
+using SecureEmiCard.Application.Features.Audit;
 
 namespace SecureEmiCard.Application;
 
@@ -23,6 +24,7 @@ public static class DependencyInjection
         services.AddSingleton<ICashbackEngine, CashbackEngine>();
         services.AddScoped<IEmiService, EmiService>();
         services.AddSingleton<IEmiCalculator, EmiCalculator>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddSingleton<ICardNumberGenerator, CardNumberGenerator>();
 
         return services;
