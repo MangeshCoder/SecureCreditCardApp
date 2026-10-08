@@ -1,4 +1,5 @@
-﻿using SecureEmiCard.Application.Abstractions.Persistence;
+﻿using Microsoft.EntityFrameworkCore;
+using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Domain.Entities;
 using System;
 using System.Collections.Generic;
