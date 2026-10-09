@@ -11,6 +11,7 @@ using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Infrastructure;
 using SecureEmiCard.Infrastructure.Persistence;
 using SecureEmiCard.Infrastructure.Security;
+using SecureEmiCard.Api.InterBank;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,24 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+
+// ---- 1b. Inter-bank gateway security (Module 5) ---------------------------------------
+builder.Services.AddOptions<InterBankOptions>()
+    .Bind(builder.Configuration.GetSection(InterBankOptions.SectionName))
+    .Validate(o => o.AllowedClockSkewSeconds is > 0 and <= 900, "InterBank:AllowedClockSkewSeconds must be 1-900.")
+    .Validate(o => o.NonceTtlSeconds >= 2 * o.AllowedClockSkewSeconds,
+              "InterBank:NonceTtlSeconds must be at least twice AllowedClockSkewSeconds (otherwise replays slip through).")
+    .Validate(o => o.MaxBodyBytes is >= 1024 and <= 1_048_576, "InterBank:MaxBodyBytes must be 1 KB - 1 MB.")
+    .Validate(o => o.Partners.Select(p => p.PartnerId).Distinct().Count() == o.Partners.Count &&
+                   o.Partners.All(p => !string.IsNullOrWhiteSpace(p.PartnerId) && p.PartnerId.Length <= 50),
+              "InterBank:Partners must have unique PartnerIds (max 50 characters).")
+    .Validate(o => o.Partners.All(p => KeyLength(p.EncryptionKey) == 32 && KeyLength(p.SigningKey) >= 32 &&
+                                       p.EncryptionKey != p.SigningKey),
+              "Each partner needs a Base64 32-byte EncryptionKey and a different Base64 SigningKey of at least 32 bytes.")
+    .ValidateOnStart();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<PartnerRegistry>();
+builder.Services.AddSingleton<INonceStore, MemoryNonceStore>();
 
 // ---- 2. Controllers, errors, Swagger ----------------------------------------------
 builder.Services.AddControllers()
@@ -122,6 +141,11 @@ app.Use(async (context, next) =>
     await next();
 });
 
+// Partner banks (server-to-server) are authenticated by signature, not JWT; this middleware also
+// decrypts their requests and encrypts + signs our responses. It runs only for /api/gateway.
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api/gateway"),
+            gateway => gateway.UseMiddleware<InterBankSecurityMiddleware>());
+
 app.UseCors(AngularCors);
 app.UseAuthentication();
 app.UseRateLimiter(); // after authentication so the limiter can partition by user id
@@ -132,6 +156,11 @@ app.MapControllers();
 await DbInitializer.InitializeAsync(app.Services);
 
 app.Run();
+static int KeyLength(string base64)
+{
+    var buffer = new byte[base64.Length];
+    return Convert.TryFromBase64String(base64, buffer, out var written) ? written : -1;
+}
 
 // Makes Program visible to integration tests (WebApplicationFactory<Program>).
 public partial class Program { }

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using SecureEmiCard.Api.Auditing;
 using SecureEmiCard.Application.Features.Cards;
+using SecureEmiCard.Domain.Common;
 
 namespace SecureEmiCard.Api.Controllers;
 
@@ -37,6 +39,7 @@ public class CardsController : ControllerBase
     /// <summary>Issues a new card. The response contains the full number, CVV and initial PIN exactly once.</summary>
     [HttpPost]
     [Authorize(Roles = "Admin")]
+    [Audit(AuditActions.CardIssued)]
     [ProducesResponseType<IssuedCardResponse>(StatusCodes.Status201Created)]
     public async Task<ActionResult<IssuedCardResponse>> Issue(IssueCardRequest request, CancellationToken ct)
     {
@@ -45,20 +48,24 @@ public class CardsController : ControllerBase
     }
 
     [HttpPost("{cardId:int}/block")]
+    [Audit(AuditActions.CardBlocked)]
     public async Task<ActionResult<CardDto>> Block(int cardId, CancellationToken ct)
         => Ok(await _cards.BlockCardAsync(cardId, ct));
 
     [HttpPost("{cardId:int}/activate")]
     [Authorize(Roles = "Admin")]
+    [Audit(AuditActions.CardUnblocked)]
     public async Task<ActionResult<CardDto>> Activate(int cardId, CancellationToken ct)
         => Ok(await _cards.ActivateCardAsync(cardId, ct));
 
     [HttpPut("{cardId:int}/credit-limit")]
     [Authorize(Roles = "Admin")]
+    [Audit(AuditActions.CreditLimitChanged)]
     public async Task<ActionResult<CardDto>> UpdateCreditLimit(int cardId, UpdateCreditLimitRequest request, CancellationToken ct)
         => Ok(await _cards.UpdateCreditLimitAsync(cardId, request, ct));
 
     [HttpPut("{cardId:int}/pin")]
+    [Audit(AuditActions.PinChanged)]
     [EnableRateLimiting(RateLimitPolicies.Sensitive)]
     public async Task<IActionResult> ChangePin(int cardId, ChangePinRequest request, CancellationToken ct)
     {
@@ -68,6 +75,7 @@ public class CardsController : ControllerBase
 
     /// <summary>Shows the full (decrypted) card number to its owner after PIN verification.</summary>
     [HttpPost("{cardId:int}/reveal")]
+    [Audit(AuditActions.CardNumberRevealed)]
     [EnableRateLimiting(RateLimitPolicies.Sensitive)]
     public async Task<ActionResult<RevealCardNumberResponse>> Reveal(int cardId, RevealCardNumberRequest request, CancellationToken ct)
         => Ok(await _cards.RevealCardNumberAsync(cardId, request, ct));

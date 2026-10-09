@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using SecureEmiCard.Application.Features.Auth;
+using SecureEmiCard.Api.Auditing;
+using SecureEmiCard.Domain.Common;
 
 namespace SecureEmiCard.Api.Controllers;
 
@@ -17,6 +19,7 @@ public class AuthController : ControllerBase
 
     /// <summary>Customer onboarding: creates a Cardholder account and returns a JWT.</summary>
     [HttpPost("register")]
+    [Audit(AuditActions.Register)]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status201Created)]
     public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request, CancellationToken ct)
     {
@@ -25,6 +28,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [Audit(AuditActions.Login)]
     [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request, CancellationToken ct)
         => Ok(await _authService.LoginAsync(request, ct));

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SecureEmiCard.Api.Auditing;
 using SecureEmiCard.Application.Features.Emi;
+using SecureEmiCard.Domain.Common;
 
 namespace SecureEmiCard.Api.Controllers;
 
@@ -36,6 +38,7 @@ public class EmiController : ControllerBase
 
     /// <summary>Converts a purchase into an EMI plan. Owner or Admin.</summary>
     [HttpPost("convert-transaction/{transactionId:int}")]
+    [Audit(AuditActions.EmiConversion)]
     [ProducesResponseType<EmiPlanDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<EmiPlanDto>> ConvertToEmi(int transactionId, ConvertToEmiRequest request, CancellationToken ct)
     {

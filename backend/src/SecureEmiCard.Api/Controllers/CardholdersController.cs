@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SecureEmiCard.Api.Auditing;
 using SecureEmiCard.Application.Features.Cardholders;
 using SecureEmiCard.Application.Features.Cards;
+using SecureEmiCard.Domain.Common;
 
 namespace SecureEmiCard.Api.Controllers;
 
@@ -33,6 +35,7 @@ public class CardholdersController : ControllerBase
         => Ok(await _cards.GetCardsOfCardholderAsync(cardholderId, ct));
 
     [HttpPost("{cardholderId:int}/deactivate")]
+    [Audit(AuditActions.CardholderDeactivated)]
     public async Task<IActionResult> Deactivate(int cardholderId, CancellationToken ct)
     {
         await _cardholders.SetActiveAsync(cardholderId, false, ct);
@@ -40,6 +43,7 @@ public class CardholdersController : ControllerBase
     }
 
     [HttpPost("{cardholderId:int}/activate")]
+    [Audit(AuditActions.CardholderActivated)]
     public async Task<IActionResult> Activate(int cardholderId, CancellationToken ct)
     {
         await _cardholders.SetActiveAsync(cardholderId, true, ct);
