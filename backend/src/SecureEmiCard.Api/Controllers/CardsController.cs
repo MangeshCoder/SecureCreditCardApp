@@ -29,7 +29,6 @@ public class CardsController : ControllerBase
     /// <summary>All cards in the system (bank back-office).</summary>
     [HttpGet]
     [Authorize(Roles = "Admin")]
-    [Audit(AuditActions.CardIssued)]
     public async Task<ActionResult<IReadOnlyList<CardDto>>> GetAll(CancellationToken ct)
         => Ok(await _cards.GetAllCardsAsync(ct));
 

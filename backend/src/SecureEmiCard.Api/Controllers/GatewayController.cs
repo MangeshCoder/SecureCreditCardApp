@@ -6,7 +6,6 @@ using SecureEmiCard.Application.Features.Transactions;
 
 namespace SecureEmiCard.Api.Controllers
 {
-    [Route("api/[controller]")]
     /// <summary>
     /// Server-to-server endpoint for partner banks (acquirers / payment gateways).
     /// No JWT: the caller is authenticated by InterBankSecurityMiddleware (HMAC signature, timestamp, nonce),
