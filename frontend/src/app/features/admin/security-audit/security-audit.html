@@ -1,0 +1,96 @@
+<div class="d-flex align-items-center mb-1">
+  <h1 class="h3 mb-0 me-auto">Security audit</h1>
+  <div class="btn-group btn-group-sm">
+    <button class="btn btn-outline-secondary" (click)="quickFilter('')">All</button>
+    <button class="btn btn-outline-danger" (click)="quickFilter('Rejected')">Rejected only</button>
+    <button class="btn btn-outline-warning" (click)="quickFilter('Failed')">Failed only</button>
+  </div>
+</div>
+<p class="text-muted mb-4">Append-only record of partner-bank gateway calls and sensitive user actions. Rows cannot be edited or deleted.</p>
+
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+<form class="row g-2 align-items-end mb-3" [formGroup]="filters" (ngSubmit)="load(1)">
+  <div class="col-sm-3">
+    <label class="form-label small" for="action">Action</label>
+    <select id="action" class="form-select form-select-sm" formControlName="actionType">
+      <option value="">All actions</option>
+      @for (a of actionTypes(); track a) { <option [value]="a">{{ a }}</option> }
+    </select>
+  </div>
+  <div class="col-sm-2">
+    <label class="form-label small" for="outcome">Outcome</label>
+    <select id="outcome" class="form-select form-select-sm" formControlName="outcome">
+      <option value="">Any</option>
+      <option value="Success">Success</option>
+      <option value="Rejected">Rejected</option>
+      <option value="Failed">Failed</option>
+    </select>
+  </div>
+  <div class="col-sm-3">
+    <label class="form-label small" for="partner">Partner bank</label>
+    <input id="partner" class="form-control form-control-sm" formControlName="partnerId" placeholder="e.g. DEMO-ACQUIRER">
+  </div>
+  <div class="col-sm-2">
+    <label class="form-label small" for="hours">Period</label>
+    <select id="hours" class="form-select form-select-sm" formControlName="lastHours">
+      <option [ngValue]="1">Last hour</option>
+      <option [ngValue]="24">Last 24 hours</option>
+      <option [ngValue]="168">Last 7 days</option>
+      <option [ngValue]="0">Everything</option>
+    </select>
+  </div>
+  <div class="col-sm-2">
+    <button class="btn btn-primary btn-sm w-100" type="submit">Apply</button>
+  </div>
+</form>
+
+@if (logs(); as l) {
+  <div class="table-responsive">
+    <table class="table table-sm table-hover bg-white shadow-sm align-middle">
+      <thead class="table-light">
+        <tr><th>#</th><th>Time</th><th>Action</th><th>Outcome</th><th>HTTP</th><th>Who</th><th>Detail</th><th></th></tr>
+      </thead>
+      <tbody>
+        @for (a of l.items; track a.auditId) {
+          <tr>
+            <td class="text-muted">{{ a.auditId }}</td>
+            <td class="text-nowrap small">{{ a.timestamp | date: 'medium' }}</td>
+            <td><code>{{ a.actionType }}</code></td>
+            <td><span class="badge" [class]="badge(a.outcome)">{{ a.outcome }}</span></td>
+            <td>{{ a.httpStatus }}</td>
+            <td class="small">
+              @if (a.partnerId) { <span class="badge bg-dark">{{ a.partnerId }}</span> }
+              @else if (a.userId) { User #{{ a.userId }} }
+              @else { <span class="text-muted">anonymous</span> }
+            </td>
+            <td class="small">{{ a.detail }}</td>
+            <td class="text-end"><button class="btn btn-link btn-sm" (click)="toggle(a.auditId)">{{ expanded() === a.auditId ? 'Less' : 'More' }}</button></td>
+          </tr>
+          @if (expanded() === a.auditId) {
+            <tr class="table-light">
+              <td colspan="8" class="small">
+                <div><strong>Endpoint:</strong> {{ a.endpoint }}</div>
+                <div><strong>Credential verified (HMAC / JWT):</strong> {{ a.signatureValid ? 'yes' : 'no' }}</div>
+                <div><strong>Client IP:</strong> {{ a.clientIp ?? '–' }} · <strong>Correlation id:</strong> <code>{{ a.correlationId }}</code></div>
+                <div class="text-break"><strong>Payload hash (SHA-256):</strong> <code>{{ a.payloadHash }}</code></div>
+              </td>
+            </tr>
+          }
+        } @empty {
+          <tr><td colspan="8" class="text-center text-muted">No audit entries for these filters.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (l.totalPages > 1) {
+    <nav class="d-flex justify-content-between align-items-center">
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="l.page <= 1" (click)="load(l.page - 1)">&larr; Newer</button>
+      <span class="small text-muted">Page {{ l.page }} of {{ l.totalPages }} ({{ l.totalCount }} entries)</span>
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="l.page >= l.totalPages" (click)="load(l.page + 1)">Older &rarr;</button>
+    </nav>
+  }
+}

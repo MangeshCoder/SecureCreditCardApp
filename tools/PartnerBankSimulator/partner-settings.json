@@ -1,0 +1,6 @@
+{
+  "ApiBaseUrl": "http://localhost:5080",
+  "PartnerId": "DEMO-ACQUIRER",
+  "EncryptionKey": "1AYOY9aUAwB7euum1LJMEp55O8+xTmQpD7PS4NVJoGk=",
+  "SigningKey": "0QgjUSUtytnELPvzBFxuhmfD6gWByKa7pVsulk/3U0Ll67y1419p0CwfNkbi/1lL"
+}

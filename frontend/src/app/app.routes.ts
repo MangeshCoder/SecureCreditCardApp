@@ -52,6 +52,12 @@ export const routes: Routes = [
       import('./features/admin/all-transactions/all-transactions').then(m => m.AllTransactions)
   },
   {
+    path: 'admin/security-audit',
+    canActivate: [adminGuard],
+    loadComponent: () =>
+      import('./features/admin/security-audit/security-audit').then(m => m.SecurityAudit)
+  },
+  {
     path: 'admin/cardholders',
     canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/cardholders/cardholders').then(m => m.Cardholders)
