@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using SecureEmiCard.Api.Auditing;
 using SecureEmiCard.Application.Common.Models;
 using SecureEmiCard.Application.Features.Transactions;
+using SecureEmiCard.Domain.Common;
 
 namespace SecureEmiCard.Api.Controllers;
 
@@ -34,6 +36,7 @@ public class TransactionsController : ControllerBase
 
     /// <summary>Full refund of a completed swipe (merchant / bank back office).</summary>
     [HttpPost("{transactionId:int}/refund")]
+    [Audit(AuditActions.Refund)]
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<BalanceChangeResponse>> Refund(int transactionId, CancellationToken ct)
         => Ok(await _transactions.RefundAsync(transactionId, ct));
