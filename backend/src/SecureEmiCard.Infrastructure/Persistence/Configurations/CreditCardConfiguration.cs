@@ -31,6 +31,9 @@ public class CreditCardConfiguration : IEntityTypeConfiguration<CreditCard>
         b.Property(x => x.ExpiryDate).HasColumnType("date");
         b.Property(x => x.CreatedAt).HasColumnType("datetime2");
         b.Property(x => x.LockedAt).HasColumnType("datetime2");
+        // Module 8: a concurrency token too, so two billing runs for the same card (scheduler + the bank's button)
+        // can't both close the same cycle - the second one fails and starts again.
+        b.Property(x => x.LastStatementDate).HasColumnType("datetime2").IsConcurrencyToken();
 
         // Module 6: the card's controls live in their own table, keyed by the same CardId.
         b.HasOne(x => x.Controls)

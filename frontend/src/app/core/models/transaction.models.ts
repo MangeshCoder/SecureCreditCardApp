@@ -1,6 +1,7 @@
 import { Card } from './card.models';
 
-export type TransactionType = 'Swipe' | 'Load' | 'Refund' | 'EmiInstallment';
+/** Fee, Interest, Tax (GST): bank charges (Module 8). */
+export type TransactionType = 'Swipe' | 'Load' | 'Refund' | 'EmiInstallment' | 'Fee' | 'Interest' | 'Tax';
 export type TransactionStatus = 'Completed' | 'Declined' | 'Refunded';
 /** Module 6: how the card was used. */
 export type TransactionChannel = 'Pos' | 'Online' | 'Contactless' | 'Atm';

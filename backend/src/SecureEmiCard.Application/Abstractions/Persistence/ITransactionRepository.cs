@@ -20,5 +20,17 @@ public interface ITransactionRepository
     /// </summary>
     Task<DailySpend> GetApprovedSpendAsync(int cardId, DateTime sinceUtc, CancellationToken ct = default);
 
+    /// <summary>
+    /// Module 8: rows not on any statement yet that change what is owed - approved swipes, repayments, refunds
+    /// and charges (tracked, so they can be marked billed). Declined swipes and EMI installments are not billed.
+    /// </summary>
+    Task<IReadOnlyList<CardTransaction>> GetUnbilledAsync(int cardId, CancellationToken ct = default);
+
+    /// <summary>Module 8: the rows billed on a statement, oldest first.</summary>
+    Task<IReadOnlyList<CardTransaction>> GetByStatementAsync(int statementId, CancellationToken ct = default);
+
+    /// <summary>Module 8: repayments (Load) made in (after, until] - what counts as "paid by the due date".</summary>
+    Task<decimal> SumPaymentsAsync(int cardId, DateTime afterUtc, DateTime untilUtc, CancellationToken ct = default);
+
     Task AddAsync(CardTransaction transaction, CancellationToken ct = default);
 }

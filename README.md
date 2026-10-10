@@ -38,8 +38,8 @@ SecureCreditCardApp/
 | 5 | [Inter-Bank Payload Security + Security Audit Log](docs/05-Module-5-InterBank-Security-Audit.md) | ✅ Done |
 | 6 | [Card Controls & Spending Limits (channels, international, daily limits, temporary lock)](docs/06-Module-6-Card-Controls.md) | ✅ Done |
 | 7 | [OTP / Two-Factor Authentication + Notifications (step-up codes, alerts, SMS/e-mail outbox)](docs/07-Module-7-Otp-Notifications.md) | ✅ Done |
-| 8 | Billing cycle & statements (minimum due, due date, late fee, interest, PDF) | ⏳ Next |
-| 9 | EMI extras (processing fee + GST, foreclosure, Key Fact Statement) | ⏳ |
+| 8 | [Billing Cycle & Statements (minimum due, due date, late fee, interest, cash advance, PDF)](docs/08-Module-8-Billing-Statements.md) | ✅ Done |
+| 9 | EMI extras (processing fee + GST, foreclosure, Key Fact Statement) | ⏳ Next |
 | 10 | Fraud detection rules | ⏳ |
 | 11 | Rewards 2.0 (points, milestones, redemption) | ⏳ |
 | 12 | Deployment (Docker, Azure App Service, Key Vault, CI/CD) | ⏳ |
@@ -59,6 +59,7 @@ sqlcmd -S localhost -E -i database/04_Module4_Emi.sql
 sqlcmd -S localhost -E -i database/05_Module5_Security_Audit.sql
 sqlcmd -S localhost -E -i database/06_Module6_Card_Controls.sql
 sqlcmd -S localhost -E -i database/07_Module7_Otp_Notifications.sql
+sqlcmd -S localhost -E -i database/08_Module8_Billing_Statements.sql
 
 # 2. API  -> http://localhost:5080/swagger
 cd backend

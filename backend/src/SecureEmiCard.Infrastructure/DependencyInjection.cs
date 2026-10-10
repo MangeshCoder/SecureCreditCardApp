@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SecureEmiCard.Application.Abstractions.Billing;
 using SecureEmiCard.Application.Abstractions.Messaging;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
+using SecureEmiCard.Application.Features.Billing;
 using SecureEmiCard.Application.Features.CardControls;
 using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Features.Emi;
@@ -15,6 +17,7 @@ using SecureEmiCard.Infrastructure.Persistence.Repositories;
 using SecureEmiCard.Infrastructure.Security;
 using SecureEmiCard.Application.Abstractions.Auditing;
 using SecureEmiCard.Infrastructure.Auditing;
+using SecureEmiCard.Infrastructure.Billing;
 using SecureEmiCard.Infrastructure.Notifications;
 
 namespace SecureEmiCard.Infrastructure;
@@ -44,6 +47,7 @@ public static class DependencyInjection
         services.AddSingleton<IAuditLogWriter, AuditLogWriter>();
         services.AddScoped<IOtpChallengeRepository, OtpChallengeRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<ICardStatementRepository, CardStatementRepository>();
 
         // ---- OTP + alerts (Module 7) ------------------------------------------------------------
         services.AddOptions<OtpOptions>()
@@ -93,6 +97,30 @@ public static class DependencyInjection
             .Validate(o => o.BusinessDayUtcOffset >= TimeSpan.FromHours(-12) && o.BusinessDayUtcOffset <= TimeSpan.FromHours(14),
                       "CardControls:BusinessDayUtcOffset must be between -12:00 and +14:00.")
             .ValidateOnStart();
+
+        // ---- Billing (Module 8) --------------------------------------------------------------
+        services.AddOptions<BillingOptions>()
+            .Bind(configuration.GetSection(BillingOptions.SectionName))
+            .Validate(o => o.CycleLength > TimeSpan.Zero && o.PaymentDuePeriod > TimeSpan.Zero,
+                      "Billing:CycleLength and PaymentDuePeriod must be positive.")
+            .Validate(o => o.MinimumDuePercent is > 0 and <= 100 && o.MinimumDueFloor >= 0,
+                      "Billing:MinimumDuePercent must be 0-100 and MinimumDueFloor >= 0.")
+            .Validate(o => o.MonthlyInterestPercent is >= 0 and <= 10, "Billing:MonthlyInterestPercent must be 0-10.")
+            .Validate(o => o.CashAdvanceFeePercent is >= 0 and <= 10 && o.CashAdvanceMinimumFee >= 0,
+                      "Billing:CashAdvanceFeePercent must be 0-10 and CashAdvanceMinimumFee >= 0.")
+            .Validate(o => o.GstPercent is >= 0 and <= 50, "Billing:GstPercent must be 0-50.")
+            .Validate(o => o.LateFeeSlabs.Count == 0 || (o.LateFeeSlabs.Last().UpTo is null &&
+                           o.LateFeeSlabs.SkipLast(1).All(s => s.UpTo > 0) &&
+                           o.LateFeeSlabs.SkipLast(1).Select(s => s.UpTo!.Value).SequenceEqual(
+                               o.LateFeeSlabs.SkipLast(1).Select(s => s.UpTo!.Value).OrderBy(v => v)) &&
+                           o.LateFeeSlabs.All(s => s.Fee >= 0)),
+                      "Billing:LateFeeSlabs must be ascending by UpTo, end with an open slab (UpTo null), fees >= 0.")
+            .Validate(o => o.SchedulerInterval >= TimeSpan.FromSeconds(1) && o.ReminderBeforeDue >= TimeSpan.Zero,
+                      "Billing:SchedulerInterval must be at least 1 second.")
+            .ValidateOnStart();
+        services.AddSingleton<IStatementPdfRenderer, QuestPdfStatementRenderer>();
+        services.AddSingleton<BillingScheduler>();
+        services.AddHostedService(sp => sp.GetRequiredService<BillingScheduler>());
 
         // ---- Security --------------------------------------------------------------
         services.AddOptions<EncryptionOptions>()

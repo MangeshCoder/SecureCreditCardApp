@@ -55,6 +55,8 @@ public class CreditCard
     /// <summary>Module 6: temporarily locked by the cardholder (unlike Blocked, the cardholder can undo it).</summary>
     public bool IsLocked { get; private set; }
     public DateTime? LockedAt { get; private set; }
+    /// <summary>Module 8: end of the last billing period (null = no statement yet).</summary>
+    public DateTime? LastStatementDate { get; private set; }
 
     public Cardholder? Cardholder { get; private set; }
     public CardControl? Controls { get; private set; }
@@ -220,6 +222,28 @@ public class CreditCard
         if (!IsLocked) throw new DomainException("Card is not locked.");
         IsLocked = false;
         LockedAt = null;
+    }
+
+    // ---- Module 8: billing --------------------------------------------------------------
+
+    /// <summary>
+    /// A bank charge (fee, interest, GST). Unlike a purchase it is never declined: it may take the card over
+    /// its limit (a negative available balance), which then blocks new purchases until the customer pays.
+    /// Allowed on blocked cards too - the bank still bills a blocked card.
+    /// </summary>
+    public void ApplyCharge(decimal amount)
+    {
+        if (amount <= 0) throw new DomainException("Charge amount must be greater than zero.");
+        AvailableBalance -= amount;
+    }
+
+    /// <summary>Closes the billing period. Also makes the statement run update this row, so a purchase
+    /// saved at the same moment fails the concurrency check and the statement is computed again.</summary>
+    public void MarkStatementGenerated(DateTime periodEndUtc)
+    {
+        if (LastStatementDate is not null && periodEndUtc <= LastStatementDate)
+            throw new DomainException("A statement for this period was already generated.");
+        LastStatementDate = periodEndUtc;
     }
 
     // ---- Module 2: PIN lockout ----------------------------------------------------------

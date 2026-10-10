@@ -27,6 +27,13 @@ public class CreditCardRepository : ICreditCardRepository
     public async Task<IReadOnlyList<CreditCard>> GetAllAsync(CancellationToken ct = default) =>
         await _db.CreditCards.AsNoTracking().OrderBy(c => c.CardId).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<int>> GetIdsWithCycleStartedOnOrBeforeAsync(DateTime cycleStartUtc, CancellationToken ct = default) =>
+        await _db.CreditCards.AsNoTracking()
+                 .Where(c => (c.LastStatementDate ?? c.CreatedAt) <= cycleStartUtc)
+                 .OrderBy(c => c.CardId)
+                 .Select(c => c.CardId)
+                 .ToListAsync(ct);
+
     public async Task AddAsync(CreditCard card, CancellationToken ct = default) =>
         await _db.CreditCards.AddAsync(card, ct);
 }

@@ -22,11 +22,12 @@ public static class Alerts
 
     // ---- Transactions -------------------------------------------------------------------------
 
-    public static Alert PurchaseApproved(CreditCard card, CardTransaction t, decimal cashback)
+    public static Alert PurchaseApproved(CreditCard card, CardTransaction t, decimal cashback, decimal cashFees = 0m)
     {
         if (t.IsCashWithdrawal)
             return new(NotificationCategory.Transaction, $"Cash withdrawal {Money(t.Amount)}",
                 $"{Money(t.Amount)} withdrawn at {t.MerchantName} with {CardName(card)}. " +
+                (cashFees > 0 ? $"Cash advance fee incl. GST {Money(cashFees)}; interest applies from today. " : "") +
                 $"Available credit {Money(card.AvailableBalance)}. {NotYou}");
 
         var where = t.Channel is null ? "" : $" ({ChannelText(t)})";
@@ -101,6 +102,37 @@ public static class Alerts
         new(NotificationCategory.Security, "New sign-in",
             $"Your account was signed in on {atUtc.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture)} UTC. " +
             "If this wasn't you, change your password and contact the bank.");
+
+    // ---- Billing (Module 8) -------------------------------------------------------------------
+
+    public static Alert StatementReady(CreditCard card, CardStatement s, Func<DateTime, string> date) =>
+        s.ClosingBalance > 0
+            ? new(NotificationCategory.Billing, $"Statement ready: {Money(s.ClosingBalance)} due by {date(s.DueDate)}",
+                $"Your statement for {CardName(card)} is ready. Total due {Money(s.ClosingBalance)}, minimum due " +
+                $"{Money(s.MinimumDue)}, pay by {date(s.DueDate)}. Pay the total to avoid interest.")
+            : new(NotificationCategory.Billing, "Statement ready: nothing to pay",
+                $"Your statement for {CardName(card)} is ready. There is nothing to pay this month.");
+
+    public static Alert PaymentReminder(CreditCard card, CardStatement s, decimal minimumLeft, Func<DateTime, string> date) =>
+        new(NotificationCategory.Billing, $"Payment due on {date(s.DueDate)}",
+            $"Please pay at least {Money(minimumLeft)} on {CardName(card)} by {date(s.DueDate)} to avoid a late fee. " +
+            $"Total due {Money(s.ClosingBalance)}.");
+
+    public static Alert StatementOutcome(CreditCard card, CardStatement s, StatementAssessment outcome, decimal lateFee,
+                                         decimal interest, decimal gst, Func<DateTime, string> date)
+    {
+        var charges = (lateFee > 0 ? $"Late fee {Money(lateFee)}" : "") +
+                      (lateFee > 0 && interest > 0 ? " and " : "") +
+                      (interest > 0 ? $"interest {Money(interest)}" : "") +
+                      (gst > 0 ? $" + GST {Money(gst)}" : "");
+        return outcome.Status == StatementStatus.Overdue
+            ? new(NotificationCategory.Billing, "Payment overdue",
+                $"The minimum due of {Money(s.MinimumDue)} on {CardName(card)} was not paid by {date(s.DueDate)} " +
+                $"(paid {Money(outcome.PaidByDueDate)}). {(charges.Length > 0 ? charges + " charged." : "")}")
+            : new(NotificationCategory.Billing, "Interest charged",
+                $"You paid {Money(outcome.PaidByDueDate)} of the {Money(s.ClosingBalance)} due on {CardName(card)}. " +
+                $"{(charges.Length > 0 ? Capitalize(charges) + " charged on the rest." : "")}");
+    }
 
     // ---- helpers -------------------------------------------------------------------------------
 

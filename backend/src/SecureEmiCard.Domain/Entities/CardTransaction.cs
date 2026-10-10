@@ -55,6 +55,17 @@ public class CardTransaction
 
     public CreditCard? Card { get; private set; }
 
+    /// <summary>Module 8: the statement that billed this row (null = unbilled, it goes on the next statement).</summary>
+    public int? StatementId { get; private set; }
+    public CardStatement? Statement { get; private set; }
+
+    /// <summary>Puts this row on a statement. Uses the navigation, so EF fills in the new statement's id.</summary>
+    public void MarkBilled(CardStatement statement)
+    {
+        if (StatementId is not null || Statement is not null) throw new DomainException("Already on a statement.");
+        Statement = statement;
+    }
+
     public bool IsCashWithdrawal => Channel == TransactionChannel.Atm;
 
     public static CardTransaction ApprovedSwipe(int cardId, string merchant, string mcc, decimal amount,
@@ -80,6 +91,23 @@ public class CardTransaction
         if (string.IsNullOrWhiteSpace(signature)) throw new DomainException("Signature is required.");
         if (DigitalSignature is not null) throw new DomainException("A digital signature is already attached.");
         DigitalSignature = signature.Length > 512 ? signature[..512] : signature;
+    }
+
+    public bool IsCharge => TransactionType is TransactionType.Fee or TransactionType.Interest or TransactionType.Tax;
+
+    /// <summary>
+    /// Module 8: a bank charge (fee, interest or GST) on the ledger. <paramref name="atUtc"/> is given by the
+    /// billing run, so a charge belongs exactly to the billing period it was computed for.
+    /// </summary>
+    public static CardTransaction Charge(int cardId, TransactionType type, string description, decimal amount, DateTime atUtc)
+    {
+        if (type is not (TransactionType.Fee or TransactionType.Interest or TransactionType.Tax))
+            throw new DomainException("Only fees, interest and taxes are charges.");
+        var charge = new CardTransaction(cardId,
+            description.Length > MaxMerchantNameLength ? description[..MaxMerchantNameLength] : description,
+            MerchantCategoryCodes.FinancialInstitution, amount, type, TransactionStatus.Completed, null);
+        charge.TransactionDate = atUtc;
+        return charge;
     }
 
     /// <summary>Ledger row for paying one EMI installment (principal + interest).</summary>

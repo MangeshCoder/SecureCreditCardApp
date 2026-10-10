@@ -1,4 +1,4 @@
-export type NotificationCategory = 'Transaction' | 'Card' | 'Security';
+export type NotificationCategory = 'Transaction' | 'Card' | 'Security' | 'Billing';
 
 /** Module 7: an alert in the in-app inbox (also sent by SMS and e-mail). */
 export interface AppNotification {

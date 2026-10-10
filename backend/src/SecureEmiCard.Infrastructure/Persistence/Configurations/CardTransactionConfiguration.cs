@@ -27,6 +27,11 @@ public class CardTransactionConfiguration : IEntityTypeConfiguration<CardTransac
         b.Property(x => x.Channel).HasConversion<string>().HasMaxLength(20);
         b.Property(x => x.MerchantCountry).HasMaxLength(2).IsFixedLength();
         b.Ignore(x => x.IsCashWithdrawal);
+        b.Ignore(x => x.IsCharge);
+
+        // Module 8: which statement billed this row (null = not billed yet).
+        b.HasOne(x => x.Statement).WithMany().HasForeignKey(x => x.StatementId).IsRequired(false)
+         .HasConstraintName("FK_Transactions_CardStatements").OnDelete(DeleteBehavior.Restrict);
 
         b.HasOne(x => x.Card)
          .WithMany()

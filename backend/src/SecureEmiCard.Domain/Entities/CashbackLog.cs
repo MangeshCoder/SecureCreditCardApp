@@ -37,6 +37,17 @@ public class CashbackLog
 
     public CardTransaction? Transaction { get; private set; }
 
+    /// <summary>Module 8: the statement that billed this row (null = unbilled, it goes on the next statement).</summary>
+    public int? StatementId { get; private set; }
+    public CardStatement? Statement { get; private set; }
+
+    /// <summary>Puts this row on a statement. Uses the navigation, so EF fills in the new statement's id.</summary>
+    public void MarkBilled(CardStatement statement)
+    {
+        if (StatementId is not null || Statement is not null) throw new DomainException("Already on a statement.");
+        Statement = statement;
+    }
+
     /// <summary>
     /// Cashback for an approved swipe. Takes the transaction object (not its id) because the swipe
     /// and its cashback are saved together - the id is only known after the INSERT, and EF Core

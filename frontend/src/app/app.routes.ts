@@ -40,6 +40,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/cards/card-controls/card-controls').then(m => m.CardControls)
   },
   {
+    path: 'cards/:cardId/statements',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/billing/card-statements/card-statements').then(m => m.CardStatements)
+  },
+  {
     path: 'cards/:cardId/rewards',
     canActivate: [authGuard],
     loadComponent: () => import('./features/cashback/card-rewards/card-rewards').then(m => m.CardRewards)

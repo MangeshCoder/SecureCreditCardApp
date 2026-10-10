@@ -8,5 +8,7 @@ public enum NotificationCategory
     /// <summary>Card lifecycle: issued, blocked, credit limit.</summary>
     Card,
     /// <summary>Security-relevant changes: sign-in, PIN, card number viewed, lock, controls.</summary>
-    Security
+    Security,
+    /// <summary>Module 8: statement ready, payment reminder, late fee / interest charged.</summary>
+    Billing
 }

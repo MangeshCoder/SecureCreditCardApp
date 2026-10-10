@@ -36,7 +36,8 @@
               <button class="btn btn-sm btn-primary me-1" (click)="saveLimit(card)">Save</button>
               <button class="btn btn-sm btn-link" (click)="editingLimit.set(null)">Cancel</button>
             } @else {
-              <a class="btn btn-sm btn-outline-dark me-1" [routerLink]="['/cards', card.cardId, 'transactions']">Statement</a>
+              <a class="btn btn-sm btn-outline-dark me-1" [routerLink]="['/cards', card.cardId, 'transactions']">Transactions</a>
+              <a class="btn btn-sm btn-outline-primary me-1" [routerLink]="['/cards', card.cardId, 'statements']">Statements</a>
               <a class="btn btn-sm btn-outline-success me-1" [routerLink]="['/cards', card.cardId, 'rewards']">Rewards</a>
               <a class="btn btn-sm btn-outline-primary me-1" [routerLink]="['/cards', card.cardId, 'emi']">EMI</a>
               <a class="btn btn-sm btn-outline-secondary me-1" [routerLink]="['/cards', card.cardId, 'controls']">Controls</a>

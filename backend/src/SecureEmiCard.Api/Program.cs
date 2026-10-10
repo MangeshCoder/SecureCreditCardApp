@@ -123,7 +123,8 @@ const string AngularCors = "angular";
 builder.Services.AddCors(options => options.AddPolicy(AngularCors, policy =>
     policy.WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>())
           .AllowAnyHeader()
-          .AllowAnyMethod()));
+          .AllowAnyMethod()
+          .WithExposedHeaders("Content-Disposition"))); // Module 8: the browser may read the PDF's file name
 
 var app = builder.Build();
 

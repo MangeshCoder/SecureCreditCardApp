@@ -17,6 +17,10 @@ public class CashbackLogConfiguration : IEntityTypeConfiguration<CashbackLog>
         b.Property(x => x.CashbackType).HasConversion<string>().HasMaxLength(20).IsRequired();
         b.Property(x => x.CreditedDate).HasColumnType("datetime2");
 
+        // Module 8: which statement billed this row (null = not billed yet).
+        b.HasOne(x => x.Statement).WithMany().HasForeignKey(x => x.StatementId).IsRequired(false)
+         .HasConstraintName("FK_CashbackLogs_CardStatements").OnDelete(DeleteBehavior.Restrict);
+
         b.HasOne(x => x.Transaction)
          .WithMany()
          .HasForeignKey(x => x.TransactionId)
