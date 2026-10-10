@@ -57,6 +57,8 @@ export class SecurityAudit implements OnInit {
   }
 
   badge(outcome: string): string {
-    return outcome === 'Success' ? 'bg-success' : outcome === 'Rejected' ? 'bg-danger' : 'bg-warning text-dark';
+    return outcome === 'Success' ? 'bg-success'
+      : outcome === 'Rejected' ? 'bg-danger'
+      : outcome === 'Challenged' ? 'bg-info text-dark' : 'bg-warning text-dark';
   }
 }

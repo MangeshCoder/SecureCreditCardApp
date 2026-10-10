@@ -1,8 +1,12 @@
 using FluentValidation;
+using Microsoft.Extensions.Options;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common.Exceptions;
+using SecureEmiCard.Application.Features.Notifications;
+using SecureEmiCard.Application.Features.Otp;
 using SecureEmiCard.Domain.Entities;
+using SecureEmiCard.Domain.Enums;
 
 namespace SecureEmiCard.Application.Features.Auth;
 
@@ -22,17 +26,24 @@ public class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _tokenGenerator;
+    private readonly IStepUpAuthenticator _stepUp;
+    private readonly INotifier _notifier;
+    private readonly OtpOptions _otp;
     private readonly IValidator<RegisterRequest> _registerValidator;
     private readonly IValidator<LoginRequest> _loginValidator;
 
     public AuthService(ICardholderRepository cardholders, IUnitOfWork unitOfWork,
                        IPasswordHasher passwordHasher, IJwtTokenGenerator tokenGenerator,
+                       IStepUpAuthenticator stepUp, INotifier notifier, IOptions<OtpOptions> otp,
                        IValidator<RegisterRequest> registerValidator, IValidator<LoginRequest> loginValidator)
     {
         _cardholders = cardholders;
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _tokenGenerator = tokenGenerator;
+        _stepUp = stepUp;
+        _notifier = notifier;
+        _otp = otp.Value;
         _registerValidator = registerValidator;
         _loginValidator = loginValidator;
     }
@@ -69,6 +80,14 @@ public class AuthService : IAuthService
         if (!_passwordHasher.Verify(request.Password, user.PasswordHash) || !user.IsActive)
             throw new UnauthorizedException("Invalid email or password.");
 
+        // Module 7: two-step sign-in. The password was right; now prove you also have the phone.
+        // Always for admins (they can act on every card), optional for cardholders.
+        var twoStep = user.Role == UserRole.Admin ? _otp.RequireForAdminLogin : _otp.RequireForCardholderLogin;
+        if (twoStep)
+            await _stepUp.RequireAsync(new StepUpRequest(user.CardholderId, OtpPurpose.Login, "login", "to sign in"), ct);
+
+        await _notifier.AddAsync(user.CardholderId, Alerts.SignedIn(DateTime.UtcNow), ct);
+        await _unitOfWork.SaveChangesAsync(ct);
         return BuildResponse(user);
     }
 

@@ -1,17 +1,21 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SecureEmiCard.Application.Abstractions.Messaging;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Features.CardControls;
 using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Features.Emi;
+using SecureEmiCard.Application.Features.Notifications;
+using SecureEmiCard.Application.Features.Otp;
 using SecureEmiCard.Domain.Entities;
 using SecureEmiCard.Infrastructure.Persistence;
 using SecureEmiCard.Infrastructure.Persistence.Repositories;
 using SecureEmiCard.Infrastructure.Security;
 using SecureEmiCard.Application.Abstractions.Auditing;
 using SecureEmiCard.Infrastructure.Auditing;
+using SecureEmiCard.Infrastructure.Notifications;
 
 namespace SecureEmiCard.Infrastructure;
 
@@ -38,6 +42,27 @@ public static class DependencyInjection
         services.AddScoped<IEmiPlanRepository, EmiPlanRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddSingleton<IAuditLogWriter, AuditLogWriter>();
+        services.AddScoped<IOtpChallengeRepository, OtpChallengeRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+
+        // ---- OTP + alerts (Module 7) ------------------------------------------------------------
+        services.AddOptions<OtpOptions>()
+            .Bind(configuration.GetSection(OtpOptions.SectionName))
+            .Validate(o => o.ExpiryMinutes is >= 1 and <= 15, "Otp:ExpiryMinutes must be 1-15.")
+            .Validate(o => o.MaxAttempts is >= 1 and <= 5, "Otp:MaxAttempts must be 1-5.")
+            .Validate(o => o.MaxCodesPerWindow >= 1 && o.WindowMinutes >= 1, "Otp:MaxCodesPerWindow and WindowMinutes must be >= 1.")
+            .ValidateOnStart();
+        services.AddOptions<NotificationOptions>()
+            .Bind(configuration.GetSection(NotificationOptions.SectionName))
+            .Validate(o => o.DispatchIntervalSeconds is >= 1 and <= 3600, "Notifications:DispatchIntervalSeconds must be 1-3600.")
+            .Validate(o => o.MaxDeliveryAttempts >= 1, "Notifications:MaxDeliveryAttempts must be >= 1.")
+            .ValidateOnStart();
+        // Development / tests: messages go to an in-memory outbox (Phone simulator). Production replaces
+        // IMessageSender with a real SMS gateway + e-mail service; Program.cs enforces that.
+        services.AddSingleton<DevMessageOutbox>();
+        services.AddSingleton<IMessageSender, SimulatedMessageSender>();
+        services.AddSingleton<NotificationDispatcher>();
+        services.AddHostedService(sp => sp.GetRequiredService<NotificationDispatcher>());
 
         // ---- Cashback rules (Module 3) ----------------------------------------------------
         // Defaults live in CashbackOptions; the optional "Cashback" config section overrides them.

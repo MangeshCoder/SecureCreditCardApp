@@ -1,5 +1,14 @@
 import { Routes } from '@angular/router';
+import { environment } from '../environments/environment';
 import { adminGuard, authGuard, guestGuard } from './core/guards/auth.guards';
+
+/**
+ * DEVELOPMENT ONLY: a production build has environment.production = true, so this route is never registered.
+ * No guard: the admin needs the sign-in code before being signed in.
+ */
+const devRoutes: Routes = environment.production ? [] : [
+  { path: 'dev/phone', loadComponent: () => import('./features/dev/phone/phone').then(m => m.Phone) }
+];
 
 // Every feature page is lazy-loaded, so its code is only downloaded when first visited.
 export const routes: Routes = [
@@ -51,6 +60,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/transactions/checkout/checkout').then(m => m.Checkout)
   },
   {
+    path: 'notifications',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/notifications/notifications').then(m => m.Notifications)
+  },
+  {
     path: 'admin/transactions',
     canActivate: [adminGuard],
     loadComponent: () =>
@@ -72,5 +86,6 @@ export const routes: Routes = [
     canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/all-cards/all-cards').then(m => m.AllCards)
   },
+  ...devRoutes,
   { path: '**', redirectTo: 'cards' }
 ];

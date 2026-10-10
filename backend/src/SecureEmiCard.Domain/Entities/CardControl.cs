@@ -65,11 +65,7 @@ public class CardControl
     public void Update(ChannelSetting pos, ChannelSetting online, ChannelSetting contactless, ChannelSetting atm,
                        ChannelSetting international, decimal creditLimit)
     {
-        EnsureValidLimit(pos, TransactionChannels.NameOf(TransactionChannel.Pos), creditLimit);
-        EnsureValidLimit(online, TransactionChannels.NameOf(TransactionChannel.Online), creditLimit);
-        EnsureValidLimit(contactless, TransactionChannels.NameOf(TransactionChannel.Contactless), creditLimit);
-        EnsureValidLimit(atm, TransactionChannels.NameOf(TransactionChannel.Atm), creditLimit);
-        EnsureValidLimit(international, TransactionChannels.InternationalName, creditLimit);
+        EnsureValid(pos, online, contactless, atm, international, creditLimit);
 
         (PosEnabled, PosDailyLimit) = (pos.Enabled, pos.DailyLimit);
         (OnlineEnabled, OnlineDailyLimit) = (online.Enabled, online.DailyLimit);
@@ -78,6 +74,22 @@ public class CardControl
         (InternationalEnabled, InternationalDailyLimit) = (international.Enabled, international.DailyLimit);
         UpdatedAt = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Module 7: would these settings make the card riskier than now? Switching something on, raising a
+    /// limit or removing one does - and then the change needs a one-time code. Switching something off or
+    /// lowering a limit makes the card safer and never needs one.
+    /// </summary>
+    public bool IsRiskIncrease(ChannelSetting pos, ChannelSetting online, ChannelSetting contactless, ChannelSetting atm,
+                               ChannelSetting international) =>
+        Riskier(PosEnabled, PosDailyLimit, pos) ||
+        Riskier(OnlineEnabled, OnlineDailyLimit, online) ||
+        Riskier(ContactlessEnabled, ContactlessDailyLimit, contactless) ||
+        Riskier(AtmEnabled, AtmDailyLimit, atm) ||
+        Riskier(InternationalEnabled, InternationalDailyLimit, international);
+
+    private static bool Riskier(bool wasEnabled, decimal? oldLimit, ChannelSetting next) =>
+        next.Enabled && (!wasEnabled || (oldLimit is not null && (next.DailyLimit is null || next.DailyLimit > oldLimit)));
 
     /// <summary>Switch checks - no database needed, so they run before the PIN is checked.</summary>
     public string? GetUsageDeclineReason(TransactionChannel channel, bool isInternational)
@@ -105,6 +117,17 @@ public class CardControl
             return DeclineReasons.InternationalDailyLimitExceeded;
 
         return null;
+    }
+
+    /// <summary>Throws if any limit is invalid. Public so a service can check BEFORE asking for an OTP.</summary>
+    public static void EnsureValid(ChannelSetting pos, ChannelSetting online, ChannelSetting contactless, ChannelSetting atm,
+                                   ChannelSetting international, decimal creditLimit)
+    {
+        EnsureValidLimit(pos, TransactionChannels.NameOf(TransactionChannel.Pos), creditLimit);
+        EnsureValidLimit(online, TransactionChannels.NameOf(TransactionChannel.Online), creditLimit);
+        EnsureValidLimit(contactless, TransactionChannels.NameOf(TransactionChannel.Contactless), creditLimit);
+        EnsureValidLimit(atm, TransactionChannels.NameOf(TransactionChannel.Atm), creditLimit);
+        EnsureValidLimit(international, TransactionChannels.InternationalName, creditLimit);
     }
 
     private static void EnsureValidLimit(ChannelSetting setting, string name, decimal creditLimit)

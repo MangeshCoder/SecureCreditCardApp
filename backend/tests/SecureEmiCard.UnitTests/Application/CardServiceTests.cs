@@ -21,6 +21,7 @@ public class CardServiceTests
 
     private readonly AppDbContext _db;
     private readonly FakeCurrentUser _user = new();
+    private readonly TestServices _services;
     private readonly CardService _sut;
     private readonly int _cardholderId;
     private readonly int _otherCardholderId;
@@ -37,14 +38,8 @@ public class CardServiceTests
         _cardholderId = alice.CardholderId;
         _otherCardholderId = bob.CardholderId;
 
-        _sut = new CardService(
-            new CreditCardRepository(_db), new CardholderRepository(_db), _db,
-            new AesGcmCardEncryptionService(TestKeys.Encryption()),
-            new HmacCardLookupHasher(TestKeys.Encryption()),
-            new PepperedSecretHasher(TestKeys.Encryption(), iterations: 1_000),
-            new CardNumberGenerator(), _user,
-            new IssueCardRequestValidator(), new UpdateCreditLimitRequestValidator(),
-            new ChangePinRequestValidator(), new RevealCardNumberRequestValidator());
+        _services = new TestServices(_db, _user);
+        _sut = _services.Cards();
     }
 
     private async Task<IssuedCardResponse> IssueAsAdmin(decimal limit = 50_000m)
@@ -96,9 +91,10 @@ public class CardServiceTests
         await Assert.ThrowsAsync<UnauthorizedException>(() =>
             _sut.ChangePinAsync(cardId, new ChangePinRequest(issued.InitialPin == "2468" ? "1357" : "2468", "2580")));
 
-        await _sut.ChangePinAsync(cardId, new ChangePinRequest(issued.InitialPin, "2580"));
+        // Module 7: both also need the one-time code sent by SMS.
+        await _services.Otp.ApproveAsync(() => _sut.ChangePinAsync(cardId, new ChangePinRequest(issued.InitialPin, "2580")));
 
-        var revealed = await _sut.RevealCardNumberAsync(cardId, new RevealCardNumberRequest("2580"));
+        var revealed = await _services.Otp.ApproveAsync(() => _sut.RevealCardNumberAsync(cardId, new RevealCardNumberRequest("2580")));
         Assert.Equal(issued.CardNumber, revealed.CardNumber);
     }
 

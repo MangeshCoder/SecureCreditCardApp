@@ -14,6 +14,8 @@ namespace SecureEmiCard.Domain.Enums
         /// <summary>A security check refused it: bad signature, replay, not authenticated/authorized, rate limit.</summary>
         Rejected,
         /// <summary>It was allowed but failed: validation, business rule or server error.</summary>
-        Failed
+        Failed,
+        /// <summary>Module 7: a one-time code was sent first (HTTP 428); the repeated request decides the outcome.</summary>
+        Challenged
     }
 }

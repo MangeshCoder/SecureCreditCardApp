@@ -2,6 +2,8 @@ using FluentValidation;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common.Exceptions;
+using SecureEmiCard.Application.Features.Notifications;
+using SecureEmiCard.Application.Features.Otp;
 using SecureEmiCard.Domain.Common;
 using SecureEmiCard.Domain.Entities;
 using SecureEmiCard.Domain.Enums;
@@ -34,6 +36,8 @@ public class CardService : ICardService
     private readonly ISecretHasher _secretHasher;
     private readonly ICardNumberGenerator _generator;
     private readonly ICurrentUser _currentUser;
+    private readonly IStepUpAuthenticator _stepUp;
+    private readonly INotifier _notifier;
     private readonly IValidator<IssueCardRequest> _issueValidator;
     private readonly IValidator<UpdateCreditLimitRequest> _limitValidator;
     private readonly IValidator<ChangePinRequest> _pinValidator;
@@ -42,7 +46,7 @@ public class CardService : ICardService
     public CardService(ICreditCardRepository cards, ICardholderRepository cardholders, IUnitOfWork unitOfWork,
                        ICardEncryptionService encryption, ICardLookupHasher lookupHasher,
                        ISecretHasher secretHasher, ICardNumberGenerator generator,
-                       ICurrentUser currentUser,
+                       ICurrentUser currentUser, IStepUpAuthenticator stepUp, INotifier notifier,
                        IValidator<IssueCardRequest> issueValidator,
                        IValidator<UpdateCreditLimitRequest> limitValidator,
                        IValidator<ChangePinRequest> pinValidator,
@@ -56,6 +60,8 @@ public class CardService : ICardService
         _secretHasher = secretHasher;
         _generator = generator;
         _currentUser = currentUser;
+        _stepUp = stepUp;
+        _notifier = notifier;
         _issueValidator = issueValidator;
         _limitValidator = limitValidator;
         _pinValidator = pinValidator;
@@ -97,6 +103,7 @@ public class CardService : ICardService
             expiryDate: EndOfMonth(DateTime.UtcNow.AddYears(CardValidityYears)));
 
         await _cards.AddAsync(card, ct);
+        await _notifier.AddAsync(card, Alerts.CardIssued(card), ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
         return new IssuedCardResponse(card.ToDto(), cardNumber, cvv, pin);
@@ -125,6 +132,7 @@ public class CardService : ICardService
         // A cardholder can block their own card instantly (e.g. lost/stolen); admins can block any card.
         var card = await GetAccessibleCardAsync(cardId, ct);
         card.Block();
+        await _notifier.AddAsync(card, Alerts.CardBlocked(card), ct);
         await _unitOfWork.SaveChangesAsync(ct);
         return card.ToDto();
     }
@@ -135,6 +143,7 @@ public class CardService : ICardService
         EnsureAdmin();
         var card = await GetCardOrThrowAsync(cardId, ct);
         card.Activate();
+        await _notifier.AddAsync(card, Alerts.CardUnblocked(card), ct);
         await _unitOfWork.SaveChangesAsync(ct);
         return card.ToDto();
     }
@@ -145,6 +154,7 @@ public class CardService : ICardService
         await _limitValidator.ValidateAndThrowAsync(request, ct);
         var card = await GetCardOrThrowAsync(cardId, ct);
         card.UpdateCreditLimit(request.NewCreditLimit);
+        await _notifier.AddAsync(card, Alerts.CreditLimitChanged(card), ct);
         await _unitOfWork.SaveChangesAsync(ct);
         return card.ToDto();
     }
@@ -154,8 +164,12 @@ public class CardService : ICardService
         await _pinValidator.ValidateAndThrowAsync(request, ct);
         var card = await GetOwnCardAsync(cardId, ct);
         await VerifyPinOrThrowAsync(card, request.CurrentPin, ct);
+        // Module 7: something you know (PIN) + something you have (the phone that receives the code).
+        await _stepUp.RequireAsync(new StepUpRequest(card.CardholderId, OtpPurpose.ChangePin,
+            $"card={card.CardId}", $"to change the PIN of {Alerts.CardName(card)}"), ct);
 
         card.ChangePin(_secretHasher.Hash(request.NewPin));
+        await _notifier.AddAsync(card, Alerts.PinChanged(card), ct);
         await _unitOfWork.SaveChangesAsync(ct);
     }
 
@@ -164,7 +178,10 @@ public class CardService : ICardService
         await _revealValidator.ValidateAndThrowAsync(request, ct);
         var card = await GetOwnCardAsync(cardId, ct);
         await VerifyPinOrThrowAsync(card, request.Pin, ct);
-        await _unitOfWork.SaveChangesAsync(ct); // persists a reset of the failed-attempt counter
+        await _stepUp.RequireAsync(new StepUpRequest(card.CardholderId, OtpPurpose.RevealCardNumber,
+            $"card={card.CardId}", $"to view the number of {Alerts.CardName(card)}"), ct);
+        await _notifier.AddAsync(card, Alerts.CardNumberViewed(card), ct);
+        await _unitOfWork.SaveChangesAsync(ct); // the alert + a reset of the failed-attempt counter
 
         return new RevealCardNumberResponse(card.CardId, _encryption.Decrypt(card.CardNumberEncrypted));
     }

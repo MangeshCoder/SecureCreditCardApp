@@ -64,13 +64,17 @@ public class CardControlsIntegrationTests : IClassFixture<SecureEmiApiFactory>
         var customer = await ClientForAsync(email, Password);
         var url = $"/api/cards/{card.Card.CardId}";
 
-        var update = await customer.PutAsJsonAsync($"{url}/controls", new
+        // Switching online on makes the card riskier: Module 7 asks for the one-time code first.
+        var update = await _api.SendWithOtpAsync(customer, () => new HttpRequestMessage(HttpMethod.Put, $"{url}/controls")
         {
-            pos = new { enabled = true, dailyLimit = (decimal?)null },
-            online = new { enabled = true, dailyLimit = 2000 },
-            contactless = new { enabled = false, dailyLimit = (decimal?)null },
-            atm = new { enabled = true, dailyLimit = (decimal?)null },
-            international = new { enabled = false, dailyLimit = (decimal?)null }
+            Content = JsonContent.Create(new
+            {
+                pos = new { enabled = true, dailyLimit = (decimal?)null },
+                online = new { enabled = true, dailyLimit = 2000 },
+                contactless = new { enabled = false, dailyLimit = (decimal?)null },
+                atm = new { enabled = true, dailyLimit = (decimal?)null },
+                international = new { enabled = false, dailyLimit = (decimal?)null }
+            })
         });
         Assert.Equal(HttpStatusCode.OK, update.StatusCode);
         var controls = await update.Content.ReadFromJsonAsync<CardControlsDto>();
@@ -83,7 +87,7 @@ public class CardControlsIntegrationTests : IClassFixture<SecureEmiApiFactory>
 
         var audit = await InDbAsync(db => db.SecurityAuditLogs
             .Where(a => a.Detail!.Contains($"cardId={card.Card.CardId}")).OrderBy(a => a.AuditId).ToListAsync());
-        var changed = Assert.Single(audit, a => a.ActionType == AuditActions.CardControlsChanged);
+        var changed = Assert.Single(audit, a => a.ActionType == AuditActions.CardControlsChanged && a.Outcome == AuditOutcome.Success);
         Assert.Contains("Online on (limit 2000.00)", changed.Detail);
         Assert.Contains("International off", changed.Detail);
         Assert.Equal(new[] { AuditOutcome.Success, AuditOutcome.Failed },

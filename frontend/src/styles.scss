@@ -24,3 +24,9 @@ body {
   font-size: 1.3rem;
   letter-spacing: 2px;
 }
+
+/* Module 7: the navbar got a bell and a dev phone button - keep every link on one line */
+.navbar .nav-link,
+.navbar .navbar-text {
+  white-space: nowrap;
+}

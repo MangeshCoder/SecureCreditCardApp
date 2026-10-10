@@ -9,6 +9,11 @@
 USE SecureEmiCardDb;
 GO
 
+-- Filtered indexes need these settings. SSMS has them ON by default, sqlcmd does not (without -I).
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
 /* -------------------------------------------------------------------------------------
    1. CreditCards.CardNumberHash  ("blind index")
       The card number is AES-GCM encrypted with a random nonce, so the same number never

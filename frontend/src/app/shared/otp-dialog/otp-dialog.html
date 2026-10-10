@@ -1,0 +1,44 @@
+@if (otp.challenge(); as c) {
+  <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="otp-title">
+    <div class="modal-dialog modal-dialog-centered">
+      <form class="modal-content" (ngSubmit)="verify()" autocomplete="off">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="otp-title">Verify it's you</h2>
+        </div>
+        <div class="modal-body">
+          <p>
+            Enter the {{ c.codeLength }}-digit code we sent to <strong>{{ c.sentTo }}</strong> {{ c.description }}.
+          </p>
+          <input #codeInput class="form-control form-control-lg text-center font-monospace" name="code" [(ngModel)]="code"
+                 inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code"
+                 aria-label="One-time code">
+          <div class="form-text">
+            Valid until {{ c.expiresAt | date: 'shortTime' }}. Never share this code with anyone, not even bank staff.
+          </div>
+          @if (otp.error(); as e) {
+            <div class="alert alert-danger py-2 mt-3 mb-0">{{ e }}</div>
+          }
+          @if (devMode) {
+            <div class="border border-warning rounded p-2 mt-3 small bg-warning-subtle">
+              <div class="fw-semibold">Development only – phone simulator</div>
+              @if (devSms(); as m) {
+                <div class="font-monospace">{{ m.body }}</div>
+              } @else {
+                <div class="text-muted">No SMS found yet.</div>
+              }
+              <a routerLink="/dev/phone" target="_blank">Open the phone in a new tab</a>
+            </div>
+          }
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link me-auto" (click)="otp.resend()" [disabled]="otp.busy()">Send a new code</button>
+          <button type="button" class="btn btn-outline-secondary" (click)="otp.cancel()" [disabled]="otp.busy()">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="otp.busy() || code.length !== 6">
+            {{ otp.busy() ? 'Checking…' : 'Verify' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="modal-backdrop show"></div>
+}

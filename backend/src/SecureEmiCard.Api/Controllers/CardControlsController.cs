@@ -31,7 +31,7 @@ public class CardControlsController : ControllerBase
     public async Task<ActionResult<CardControlsDto>> Update(int cardId, UpdateCardControlsRequest request, CancellationToken ct)
     {
         var controls = await _controls.UpdateAsync(cardId, request, ct);
-        HttpContext.SetAuditDetail(Summary(controls)); // the audit row shows WHAT was switched on, not just "changed"
+        HttpContext.SetAuditDetail(CardControlSummary.Describe(controls)); // WHAT was switched on, not just "changed"
         return Ok(controls);
     }
 
@@ -45,13 +45,4 @@ public class CardControlsController : ControllerBase
     [Audit(AuditActions.CardUnlocked)]
     public async Task<ActionResult<CardDto>> Unlock(int cardId, CancellationToken ct)
         => Ok(await _controls.UnlockAsync(cardId, ct));
-
-    private static string Summary(CardControlsDto c)
-    {
-        static string Part(string name, ChannelControlDto s) =>
-            $"{name} {(s.Enabled ? "on" : "off")}{(s.DailyLimit is { } limit ? $" (limit {limit:0.00})" : "")}";
-
-        return string.Join(" · ", Part("POS", c.Pos), Part("Online", c.Online), Part("Contactless", c.Contactless),
-                                  Part("ATM", c.Atm), Part("International", c.International));
-    }
 }

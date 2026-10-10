@@ -1,0 +1,38 @@
+<h1 class="h3 mb-1">Phone simulator</h1>
+<p class="text-muted">
+  <span class="badge text-bg-warning">Development only</span>
+  The SMS and e-mails the API would send to customers: one-time codes and alerts. Refreshes every 3 seconds.
+  In production a real SMS gateway and e-mail service deliver them, and this page is not available.
+</p>
+
+@if (unavailable()) {
+  <div class="alert alert-warning">The API's message simulator is not available (it only runs in Development).</div>
+}
+
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <button class="nav-link" [class.active]="channel() === 'Sms'" (click)="channel.set('Sms')">SMS</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" [class.active]="channel() === 'Email'" (click)="channel.set('Email')">E-mail</button>
+  </li>
+</ul>
+
+<div class="row">
+  <div class="col-lg-7">
+    @for (m of shown(); track m.id) {
+      <div class="card shadow-sm mb-2" [class.border-primary]="m.body.includes(' is your Secure Credit EMI code ')">
+        <div class="card-body py-2">
+          <div class="d-flex small text-muted mb-1">
+            <span class="me-auto">To {{ m.to }}</span>
+            <span>{{ m.sentAtUtc | date: 'mediumTime' }}</span>
+          </div>
+          @if (m.subject) { <div class="fw-semibold">{{ m.subject }}</div> }
+          <div>{{ m.body }}</div>
+        </div>
+      </div>
+    } @empty {
+      <p class="text-muted">No messages yet.</p>
+    }
+  </div>
+</div>

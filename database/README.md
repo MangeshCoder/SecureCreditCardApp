@@ -14,6 +14,7 @@ Run the scripts **in order**. Each module adds its own script, and every script 
 | `04_Module4_Emi.sql` | 4 – EMI | creates `EmiPlans`, `EmiSchedules`; adds the `EmiInstallment` transaction type |
 | `05_Module5_Security_Audit.sql` | 5 – Inter-bank security | creates the append-only `SecurityAuditLogs` (+ trigger) |
 | `06_Module6_Card_Controls.sql` | 6 – Card controls | creates `CardControls`; adds `CreditCards.IsLocked` and `Transactions.Channel` / `MerchantCountry` / `IsInternational` |
+| `07_Module7_Otp_Notifications.sql` | 7 – OTP + alerts | creates `OtpChallenges` and `Notifications`; adds the `Challenged` audit outcome |
 
 ```powershell
 # SQL Express with Windows login (adjust the server name to yours)
@@ -23,6 +24,10 @@ sqlcmd -S localhost\SQLEXPRESS -E -i database\03_Module3_Cashback.sql
 sqlcmd -S localhost\SQLEXPRESS -E -i database\04_Module4_Emi.sql
 sqlcmd -S localhost\SQLEXPRESS -E -i database\05_Module5_Security_Audit.sql
 sqlcmd -S localhost\SQLEXPRESS -E -i database\06_Module6_Card_Controls.sql
+sqlcmd -S localhost\SQLEXPRESS -E -i database\07_Module7_Otp_Notifications.sql
 ```
 
 Or open the file in SSMS and press **Execute** (F5).
+
+Scripts 02 and 07 create *filtered* indexes, which SQL Server only allows with `QUOTED_IDENTIFIER ON`.
+SSMS has it on by default; `sqlcmd` doesn't (unless you pass `-I`), so both scripts switch it on themselves.

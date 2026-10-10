@@ -72,6 +72,7 @@ public class AuditActionFilter : IAsyncActionFilter
         var outcome = status switch
         {
             >= 200 and < 300 => AuditOutcome.Success,
+            428 => AuditOutcome.Challenged, // Module 7: a one-time code was sent; the repeated request decides
             401 or 403 or 429 => AuditOutcome.Rejected,
             _ => AuditOutcome.Failed
         };

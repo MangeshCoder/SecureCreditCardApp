@@ -1,9 +1,14 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using SecureEmiCard.Api.Infrastructure;
 using SecureEmiCard.Application.Features.Auth;
 using SecureEmiCard.Application.Features.Cards;
+using SecureEmiCard.Infrastructure.Notifications;
 
 namespace SecureEmiCard.UnitTests.Api;
 
@@ -37,6 +42,7 @@ public class SecureEmiApiFactory : WebApplicationFactory<Program>
             ["Encryption:SecretPepper"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
             ["SeedAdmin:Email"] = AdminEmail, ["SeedAdmin:Password"] = AdminPassword,
             ["RateLimiting:SensitivePermitPerMinute"] = "1000",
+            ["Otp:MaxCodesPerWindow"] = "1000",           // the admin signs in (with a code) many times per test class
             ["InterBank:MaxBodyBytes"] = "4096",
             ["InterBank:Partners:0:PartnerId"] = PartnerId,
             ["InterBank:Partners:0:Name"] = "Test Acquirer",
@@ -51,11 +57,39 @@ public class SecureEmiApiFactory : WebApplicationFactory<Program>
         foreach (var (key, value) in settings) builder.UseSetting(key, value);
     }
 
+    /// <summary>Signs in; for the admin this includes the one-time code (Module 7), read from the simulated phone.</summary>
     public async Task<string> LoginAsync(string email, string password)
     {
-        var response = await CreateClient().PostAsJsonAsync("/api/auth/login", new LoginRequest(email, password));
+        var client = CreateClient();
+        var response = await SendWithOtpAsync(client, () => new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
+        {
+            Content = JsonContent.Create(new LoginRequest(email, password))
+        });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AuthResponse>())!.Token;
+    }
+
+    /// <summary>Messages "sent" by the SMS / e-mail simulator.</summary>
+    public DevMessageOutbox Outbox => Services.GetRequiredService<DevMessageOutbox>();
+
+    /// <summary>The code from the most recent one-time-code SMS.</summary>
+    public string LatestOtpCode() =>
+        Outbox.Latest(200).First(m => m.Channel == "Sms" && m.Body.Contains(" is your Secure Credit EMI code ")).Body[..6];
+
+    /// <summary>
+    /// What the Angular OTP interceptor does: send; on 428 take the challenge id from the response and the
+    /// code from the phone, and send the same request again with the X-Otp-* headers.
+    /// </summary>
+    public async Task<HttpResponseMessage> SendWithOtpAsync(HttpClient client, Func<HttpRequestMessage> request)
+    {
+        var response = await client.SendAsync(request());
+        if (response.StatusCode != HttpStatusCode.PreconditionRequired) return response;
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var retry = request();
+        retry.Headers.Add(HttpOtpProofAccessor.ChallengeHeader, problem.GetProperty("otp").GetProperty("challengeId").GetInt32().ToString());
+        retry.Headers.Add(HttpOtpProofAccessor.CodeHeader, LatestOtpCode());
+        return await client.SendAsync(retry);
     }
 
     /// <summary>Registers a customer and issues a card (as admin). Returns the one-time card details.</summary>

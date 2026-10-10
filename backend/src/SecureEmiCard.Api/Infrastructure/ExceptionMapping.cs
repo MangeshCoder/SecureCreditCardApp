@@ -21,6 +21,12 @@ namespace SecureEmiCard.Api.Infrastructure
                 Status = StatusCodes.Status400BadRequest,
                 Title = "One or more validation errors occurred."
             },
+            // Module 7: "send the request again with the code" - the challenge (never the code) goes to the client.
+            OtpRequiredException otp => WithExtension(
+                Problem(StatusCodes.Status428PreconditionRequired, "Verification required", exception.Message), "otp", otp.Challenge),
+            OtpFailedException => WithExtension(
+                Problem(StatusCodes.Status403Forbidden, "Verification failed", exception.Message), "otpFailed", true),
+            TooManyRequestsException => Problem(StatusCodes.Status429TooManyRequests, "Too many requests", exception.Message),
             DomainException => Problem(StatusCodes.Status400BadRequest, "Business rule violated", exception.Message),
             NotFoundException => Problem(StatusCodes.Status404NotFound, "Not found", exception.Message),
             ConcurrencyConflictException => Problem(StatusCodes.Status409Conflict, "Conflict", exception.Message),
@@ -35,6 +41,12 @@ namespace SecureEmiCard.Api.Infrastructure
 
         private static ProblemDetails Problem(int status, string title, string detail) =>
             new() { Status = status, Title = title, Detail = detail };
+
+        private static ProblemDetails WithExtension(ProblemDetails problem, string key, object value)
+        {
+            problem.Extensions[key] = value;
+            return problem;
+        }
 
         private static string ToCamelCase(string name) =>
             string.IsNullOrEmpty(name) ? name : char.ToLowerInvariant(name[0]) + name[1..];

@@ -44,21 +44,10 @@ public class EmiFlowTests
         _aliceId = alice.CardholderId;
         _bobId = bob.CardholderId;
 
-        var hasher = new PepperedSecretHasher(TestKeys.Encryption(), iterations: 1_000);
-        var lookup = new HmacCardLookupHasher(TestKeys.Encryption());
-
-        _cards = new CardService(new CreditCardRepository(_db), new CardholderRepository(_db), _db,
-            new AesGcmCardEncryptionService(TestKeys.Encryption()), lookup, hasher, new CardNumberGenerator(), _user,
-            new IssueCardRequestValidator(), new UpdateCreditLimitRequestValidator(),
-            new ChangePinRequestValidator(), new RevealCardNumberRequestValidator());
-        _transactions = new TransactionService(new CreditCardRepository(_db), new TransactionRepository(_db),
-            new CashbackRepository(_db), new CashbackEngine(Options.Create(new CashbackOptions())),
-            new EmiPlanRepository(_db), _db, lookup, hasher, _user,
-            new CardControlRules(Options.Create(new CardControlOptions())),
-            new SwipeRequestValidator(), new LoadRequestValidator());
-        _sut = new EmiService(new EmiCalculator(Options.Create(new EmiOptions())), new EmiPlanRepository(_db),
-            new TransactionRepository(_db), new CreditCardRepository(_db), _db, _user,
-            new EmiPreviewRequestValidator(), new ConvertToEmiRequestValidator());
+        var services = new TestServices(_db, _user);
+        _cards = services.Cards();
+        _transactions = services.Transactions();
+        _sut = services.Emi();
     }
 
     private AppDbContext NewContext() =>
