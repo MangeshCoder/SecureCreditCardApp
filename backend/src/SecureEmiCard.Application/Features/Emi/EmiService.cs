@@ -4,6 +4,7 @@ using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common;
 using SecureEmiCard.Application.Common.Exceptions;
 using SecureEmiCard.Application.Features.Cards;
+using SecureEmiCard.Application.Features.Notifications;
 using SecureEmiCard.Domain.Common;
 using SecureEmiCard.Domain.Entities;
 using SecureEmiCard.Domain.Enums;
@@ -41,11 +42,12 @@ public class EmiService : IEmiService
     private readonly ICreditCardRepository _cards;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUser _currentUser;
+    private readonly INotifier _notifier;
     private readonly IValidator<EmiPreviewRequest> _previewValidator;
     private readonly IValidator<ConvertToEmiRequest> _convertValidator;
 
     public EmiService(IEmiCalculator calculator, IEmiPlanRepository plans, ITransactionRepository transactions,
-                      ICreditCardRepository cards, IUnitOfWork unitOfWork, ICurrentUser currentUser,
+                      ICreditCardRepository cards, IUnitOfWork unitOfWork, ICurrentUser currentUser, INotifier notifier,
                       IValidator<EmiPreviewRequest> previewValidator, IValidator<ConvertToEmiRequest> convertValidator)
     {
         _calculator = calculator;
@@ -54,6 +56,7 @@ public class EmiService : IEmiService
         _cards = cards;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
+        _notifier = notifier;
         _previewValidator = previewValidator;
         _convertValidator = convertValidator;
     }
@@ -127,6 +130,7 @@ public class EmiService : IEmiService
 
             // 4. Save plan + schedules + the converted flag in one database transaction (spec step 4).
             await _plans.AddAsync(plan, ct);
+            await _notifier.AddAsync(card, Alerts.ConvertedToEmi(card, plan, purchase), ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
             return ToDto(plan, purchase);
@@ -175,6 +179,7 @@ public class EmiService : IEmiService
 
             plan.PayInstallment(installmentNumber, payment, DateTime.UtcNow); // order + "already paid" rules
             card.ReleaseEmiPrincipal(installment.PrincipalComponent);          // principal part frees the limit
+            await _notifier.AddAsync(card, Alerts.EmiInstallmentPaid(card, plan, installmentNumber, installment.AmountDue), ct);
 
             // Plan, schedule row, ledger row and card balance: one database transaction.
             // A double-clicked "Pay" fails the card's concurrency check, is retried, and then stops at

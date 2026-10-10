@@ -7,8 +7,10 @@ using Microsoft.OpenApi.Models;
 using SecureEmiCard.Api;
 using SecureEmiCard.Api.Infrastructure;
 using SecureEmiCard.Application;
+using SecureEmiCard.Application.Abstractions.Messaging;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Infrastructure;
+using SecureEmiCard.Infrastructure.Notifications;
 using SecureEmiCard.Infrastructure.Persistence;
 using SecureEmiCard.Infrastructure.Security;
 using SecureEmiCard.Api.InterBank;
@@ -20,6 +22,17 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<IOtpProofAccessor, HttpOtpProofAccessor>(); // Module 7: X-Otp-* headers
+
+// Module 7: the simulated SMS / e-mail sender keeps one-time codes and alerts in server memory. A bank must
+// never run like that for real customers: outside Development and the test environment the app refuses to
+// start while the simulator is the registered IMessageSender (register a real provider instead).
+var messageSender = builder.Services.Last(d => d.ServiceType == typeof(IMessageSender)).ImplementationType;
+if (messageSender == typeof(SimulatedMessageSender)
+    && !builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+    throw new InvalidOperationException(
+        "The simulated SMS / e-mail sender is for Development only. Register a real IMessageSender before running in " +
+        $"'{builder.Environment.EnvironmentName}'.");
 
 // ---- 1b. Inter-bank gateway security (Module 5) ---------------------------------------
 builder.Services.AddOptions<InterBankOptions>()

@@ -1,9 +1,12 @@
+using System.Globalization;
 using FluentValidation;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common;
 using SecureEmiCard.Application.Common.Exceptions;
 using SecureEmiCard.Application.Features.Cards;
+using SecureEmiCard.Application.Features.Notifications;
+using SecureEmiCard.Application.Features.Otp;
 using SecureEmiCard.Domain.Common;
 using SecureEmiCard.Domain.Entities;
 using SecureEmiCard.Domain.Enums;
@@ -23,6 +26,8 @@ public interface ICardControlService
 /// Only the cardholder may change them. Admins can look (customer support) but not touch - the bank's
 /// own tools are Block / Unblock and the credit limit.
 /// The rules themselves are applied in TransactionService.AuthorizeAsync for every swipe.
+/// Module 7: changes that make the card riskier (unlock, switching something on, raising a limit) need a
+/// one-time code; every change sends the cardholder an alert.
 /// </summary>
 public class CardControlService : ICardControlService
 {
@@ -32,9 +37,12 @@ public class CardControlService : ICardControlService
     private readonly ICurrentUser _currentUser;
     private readonly ICardControlRules _rules;
     private readonly IValidator<UpdateCardControlsRequest> _validator;
+    private readonly IStepUpAuthenticator _stepUp;
+    private readonly INotifier _notifier;
 
     public CardControlService(ICreditCardRepository cards, ITransactionRepository transactions, IUnitOfWork unitOfWork,
-                              ICurrentUser currentUser, ICardControlRules rules, IValidator<UpdateCardControlsRequest> validator)
+                              ICurrentUser currentUser, ICardControlRules rules, IValidator<UpdateCardControlsRequest> validator,
+                              IStepUpAuthenticator stepUp, INotifier notifier)
     {
         _cards = cards;
         _transactions = transactions;
@@ -42,6 +50,8 @@ public class CardControlService : ICardControlService
         _currentUser = currentUser;
         _rules = rules;
         _validator = validator;
+        _stepUp = stepUp;
+        _notifier = notifier;
     }
 
     public async Task<CardControlsDto> GetAsync(int cardId, CancellationToken ct = default)
@@ -58,19 +68,39 @@ public class CardControlService : ICardControlService
         var card = await GetOwnCardAsync(cardId, ct);
         if (!card.IsActive) throw new DomainException("This card is blocked. Contact the bank to unblock it.");
 
-        card.EnsureControls().Update(
-            ToSetting(request.Pos), ToSetting(request.Online), ToSetting(request.Contactless),
-            ToSetting(request.Atm), ToSetting(request.International), card.CreditLimit);
+        var (pos, online, contactless, atm, international) = (ToSetting(request.Pos), ToSetting(request.Online),
+            ToSetting(request.Contactless), ToSetting(request.Atm), ToSetting(request.International));
+        CardControl.EnsureValid(pos, online, contactless, atm, international, card.CreditLimit); // before any OTP
+
+        var controls = card.EnsureControls();
+        if (controls.IsRiskIncrease(pos, online, contactless, atm, international))
+        {
+            // The code approves exactly THESE settings: if they are changed afterwards, it no longer fits.
+            await _stepUp.RequireAsync(new StepUpRequest(card.CardholderId, OtpPurpose.CardControls,
+                $"card={card.CardId}|{Fingerprint(request)}", $"to change the controls of {Alerts.CardName(card)}"), ct);
+        }
+
+        controls.Update(pos, online, contactless, atm, international, card.CreditLimit);
+        await _notifier.AddAsync(card, Alerts.CardControlsChanged(card, CardControlSummary.Describe(controls)), ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
         return await ToDtoAsync(card, ct);
     }
 
+    /// <summary>Locking makes the card safer: no code needed.</summary>
     public Task<CardDto> LockAsync(int cardId, CancellationToken ct = default) =>
-        ChangeLockAsync(cardId, card => card.Lock(), ct);
+        ChangeLockAsync(cardId, card => card.Lock(), Alerts.CardLocked, ct);
 
-    public Task<CardDto> UnlockAsync(int cardId, CancellationToken ct = default) =>
-        ChangeLockAsync(cardId, card => card.Unlock(), ct);
+    /// <summary>Unlocking makes it usable again - exactly what a thief would want, so it needs a code.</summary>
+    public async Task<CardDto> UnlockAsync(int cardId, CancellationToken ct = default)
+    {
+        var card = await GetOwnCardAsync(cardId, ct);
+        if (!card.IsLocked) throw new DomainException("Card is not locked."); // checked before any SMS is sent
+        await _stepUp.RequireAsync(new StepUpRequest(card.CardholderId, OtpPurpose.UnlockCard,
+            $"card={card.CardId}", $"to unlock {Alerts.CardName(card)}"), ct);
+
+        return await ChangeLockAsync(cardId, c => c.Unlock(), Alerts.CardUnlocked, ct);
+    }
 
     // ---- helpers -------------------------------------------------------------
 
@@ -78,11 +108,13 @@ public class CardControlService : ICardControlService
     /// The lock is a column of CreditCards, whose AvailableBalance is a concurrency token: if a swipe
     /// changes the balance at the same moment, the save fails and we retry with fresh data.
     /// </summary>
-    private Task<CardDto> ChangeLockAsync(int cardId, Action<CreditCard> change, CancellationToken ct) =>
+    private Task<CardDto> ChangeLockAsync(int cardId, Action<CreditCard> change, Func<CreditCard, Alert> alert,
+                                          CancellationToken ct) =>
         _unitOfWork.WithConcurrencyRetryAsync(async () =>
         {
             var card = await GetOwnCardAsync(cardId, ct);
             change(card);
+            await _notifier.AddAsync(card, alert(card), ct);
             await _unitOfWork.SaveChangesAsync(ct);
             return card.ToDto();
         });
@@ -115,4 +147,11 @@ public class CardControlService : ICardControlService
     }
 
     private static ChannelSetting ToSetting(ChannelSettingRequest r) => new(r.Enabled, r.DailyLimit);
+
+    private static string Fingerprint(UpdateCardControlsRequest r)
+    {
+        static string S(ChannelSettingRequest s) =>
+            $"{(s.Enabled ? 1 : 0)}:{s.DailyLimit?.ToString("0.00", CultureInfo.InvariantCulture) ?? "-"}";
+        return $"pos={S(r.Pos)};online={S(r.Online)};contactless={S(r.Contactless)};atm={S(r.Atm)};international={S(r.International)}";
+    }
 }

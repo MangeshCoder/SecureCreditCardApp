@@ -1,3 +1,4 @@
+using System.Globalization;
 using FluentValidation;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
@@ -7,6 +8,8 @@ using SecureEmiCard.Application.Common.Models;
 using SecureEmiCard.Application.Features.CardControls;
 using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Features.Cards;
+using SecureEmiCard.Application.Features.Notifications;
+using SecureEmiCard.Application.Features.Otp;
 using SecureEmiCard.Domain.Common;
 using SecureEmiCard.Domain.Entities;
 using SecureEmiCard.Domain.Enums;
@@ -53,6 +56,8 @@ public class TransactionService : ITransactionService
     private readonly ISecretHasher _secretHasher;
     private readonly ICurrentUser _currentUser;
     private readonly ICardControlRules _controlRules;
+    private readonly IStepUpAuthenticator _stepUp;
+    private readonly INotifier _notifier;
     private readonly IValidator<SwipeRequest> _swipeValidator;
     private readonly IValidator<LoadRequest> _loadValidator;
 
@@ -60,7 +65,7 @@ public class TransactionService : ITransactionService
                               ICashbackRepository cashback, ICashbackEngine cashbackEngine,
                               IEmiPlanRepository emiPlans, IUnitOfWork unitOfWork,
                               ICardLookupHasher lookupHasher, ISecretHasher secretHasher, ICurrentUser currentUser,
-                              ICardControlRules controlRules,
+                              ICardControlRules controlRules, IStepUpAuthenticator stepUp, INotifier notifier,
                               IValidator<SwipeRequest> swipeValidator, IValidator<LoadRequest> loadValidator)
     {
         _cards = cards;
@@ -73,6 +78,8 @@ public class TransactionService : ITransactionService
         _secretHasher = secretHasher;
         _currentUser = currentUser;
         _controlRules = controlRules;
+        _stepUp = stepUp;
+        _notifier = notifier;
         _swipeValidator = swipeValidator;
         _loadValidator = loadValidator;
     }
@@ -95,10 +102,11 @@ public class TransactionService : ITransactionService
     /// Who sends the swipe: the in-app simulator (JWT user) or a verified partner bank.
     /// (Not to be confused with the Module 6 TransactionChannel: HOW the card is used - shop, online, tap, ATM.)
     /// </summary>
-    private sealed record SwipeSource(bool AnyCard, string? PartnerSignature)
+    private sealed record SwipeSource(bool AnyCard, string? PartnerSignature, bool AsksForOnlineOtp)
     {
-        public static readonly SwipeSource Simulator = new(false, null);
-        public static SwipeSource Gateway(string signature) => new(true, signature);
+        public static readonly SwipeSource Simulator = new(false, null, true);
+        // A partner bank authenticates the cardholder itself (3-D Secure) before it calls the gateway.
+        public static SwipeSource Gateway(string signature) => new(true, signature, false);
     }
 
     private async Task<SwipeResponse> AuthorizeAsync(SwipeRequest r, SwipeSource source, CancellationToken ct)
@@ -146,13 +154,24 @@ public class TransactionService : ITransactionService
         var reason = card.GetSwipeDeclineReason(r.Amount);
         if (reason is not null) return await RecordDeclineAsync(card, r, origin, source, reason, ct);
 
-        // 7. Approve: debit + ledger row ...
+        // 7. Module 7: an online purchase needs a one-time code sent to the cardholder's phone (RBI "additional
+        //    factor of authentication"; 3-D Secure in card networks). The code is bound to this card, amount and
+        //    merchant, so it cannot approve a different payment. Asked last: no SMS for a payment that fails anyway.
+        if (origin.Channel == TransactionChannel.Online && source.AsksForOnlineOtp)
+        {
+            var merchant = r.MerchantName.Trim();
+            await _stepUp.RequireAsync(new StepUpRequest(card.CardholderId, OtpPurpose.OnlinePayment,
+                $"card={card.CardId}|amount={r.Amount.ToString("0.00", CultureInfo.InvariantCulture)}|merchant={merchant}",
+                $"to pay {Alerts.Money(r.Amount)} at {merchant} with {Alerts.CardName(card)}"), ct);
+        }
+
+        // 8. Approve: debit + ledger row ...
         card.Debit(r.Amount);
         var txn = CardTransaction.ApprovedSwipe(card.CardId, r.MerchantName, r.MerchantCategoryCode, r.Amount, origin);
         if (source.PartnerSignature is not null) txn.AttachDigitalSignature(source.PartnerSignature);
         await _transactions.AddAsync(txn, ct);
 
-        // 8. ... + cashback (Module 3). All three are committed together by ONE SaveChanges:
+        // 9. ... + cashback (Module 3) + the alert (Module 7). All committed together by ONE SaveChanges:
         //    a swipe can never be saved without its cashback, or cashback without its swipe.
         //    Cash from an ATM is not a purchase, so it earns no cashback (Module 6).
         var cashback = txn.IsCashWithdrawal ? CashbackQuote.None : _cashbackEngine.Calculate(r.Amount, r.MerchantCategoryCode);
@@ -161,6 +180,7 @@ public class TransactionService : ITransactionService
             card.CreditReward(cashback.Amount);
             await _cashback.AddAsync(CashbackLog.Earned(txn, cashback.Percentage, cashback.Amount), ct);
         }
+        await _notifier.AddAsync(card, Alerts.PurchaseApproved(card, txn, cashback.Amount), ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
 
@@ -176,6 +196,7 @@ public class TransactionService : ITransactionService
         var txn = CardTransaction.DeclinedSwipe(card.CardId, r.MerchantName, r.MerchantCategoryCode, r.Amount, reason, origin);
         if (source.PartnerSignature is not null) txn.AttachDigitalSignature(source.PartnerSignature);
         await _transactions.AddAsync(txn, ct);
+        await _notifier.AddAsync(card, Alerts.PurchaseDeclined(card, txn), ct); // e.g. someone trying your card
         await _unitOfWork.SaveChangesAsync(ct); // also persists the PIN attempt counter
         return Declined(txn.TransactionId, card.MaskedCardNumber, r.Amount, reason);
     }
@@ -203,6 +224,7 @@ public class TransactionService : ITransactionService
 
             var txn = CardTransaction.Load(card.CardId, request.Amount);
             await _transactions.AddAsync(txn, ct);
+            await _notifier.AddAsync(card, Alerts.RepaymentReceived(card, request.Amount), ct);
             await _unitOfWork.SaveChangesAsync(ct);
 
             return new BalanceChangeResponse(ToDto(txn, card), card.ToDto());
@@ -234,6 +256,7 @@ public class TransactionService : ITransactionService
                 card.ReverseReward(earned.CashbackAmount);
                 await _cashback.AddAsync(earned.CreateReversal(), ct);
             }
+            await _notifier.AddAsync(card, Alerts.RefundCredited(card, refund), ct);
 
             await _unitOfWork.SaveChangesAsync(ct);
 

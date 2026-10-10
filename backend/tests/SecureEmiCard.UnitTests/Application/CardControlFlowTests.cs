@@ -31,6 +31,7 @@ public class CardControlFlowTests
     private readonly string _dbName = Guid.NewGuid().ToString();
     private readonly AppDbContext _db;
     private readonly FakeCurrentUser _user = new();
+    private readonly TestServices _services;
     private readonly CardService _cards;
     private readonly TransactionService _transactions;
     private readonly CardControlService _sut;
@@ -47,20 +48,10 @@ public class CardControlFlowTests
         _aliceId = alice.CardholderId;
         _bobId = bob.CardholderId;
 
-        var hasher = new PepperedSecretHasher(TestKeys.Encryption(), iterations: 1_000);
-        var lookup = new HmacCardLookupHasher(TestKeys.Encryption());
-        var rules = new CardControlRules(Options.Create(new CardControlOptions()));
-
-        _cards = new CardService(new CreditCardRepository(_db), new CardholderRepository(_db), _db,
-            new AesGcmCardEncryptionService(TestKeys.Encryption()), lookup, hasher, new CardNumberGenerator(), _user,
-            new IssueCardRequestValidator(), new UpdateCreditLimitRequestValidator(),
-            new ChangePinRequestValidator(), new RevealCardNumberRequestValidator());
-        _transactions = new TransactionService(new CreditCardRepository(_db), new TransactionRepository(_db),
-            new CashbackRepository(_db), new CashbackEngine(Options.Create(new CashbackOptions())),
-            new EmiPlanRepository(_db), _db, lookup, hasher, _user, rules,
-            new SwipeRequestValidator(), new LoadRequestValidator());
-        _sut = new CardControlService(new CreditCardRepository(_db), new TransactionRepository(_db), _db, _user, rules,
-            new UpdateCardControlsRequestValidator());
+        _services = new TestServices(_db, _user);
+        _cards = _services.Cards();
+        _transactions = _services.Transactions();
+        _sut = _services.CardControls();
     }
 
     private async Task<IssuedCardResponse> IssueToAlice(decimal limit = 100_000m)
@@ -72,16 +63,17 @@ public class CardControlFlowTests
         return issued;
     }
 
+    /// <summary>Online purchases need the one-time code (Module 7) - entered automatically, like a user would.</summary>
     private Task<SwipeResponse> Swipe(IssuedCardResponse c, decimal amount, TransactionChannel channel = TransactionChannel.Pos,
                                       string? country = null, string mcc = MerchantCategoryCodes.Groceries, string? pin = null) =>
-        _transactions.SwipeAsync(new SwipeRequest(c.CardNumber, c.Card.ExpiryDate.Month, c.Card.ExpiryDate.Year, c.Cvv,
-                                                  pin ?? c.InitialPin, "Merchant", mcc, amount, channel, country));
+        _services.Otp.CompleteAsync(() => _transactions.SwipeAsync(new SwipeRequest(c.CardNumber, c.Card.ExpiryDate.Month,
+            c.Card.ExpiryDate.Year, c.Cvv, pin ?? c.InitialPin, "Merchant", mcc, amount, channel, country)));
 
     private Task<CardControlsDto> SetControls(IssuedCardResponse c, ChannelSettingRequest? pos = null,
                                               ChannelSettingRequest? online = null, ChannelSettingRequest? contactless = null,
                                               ChannelSettingRequest? atm = null, ChannelSettingRequest? international = null) =>
-        _sut.UpdateAsync(c.Card.CardId, new UpdateCardControlsRequest(pos ?? On, online ?? Off, contactless ?? Off,
-                                                                      atm ?? On, international ?? Off));
+        _services.Otp.CompleteAsync(() => _sut.UpdateAsync(c.Card.CardId, new UpdateCardControlsRequest(pos ?? On,
+            online ?? Off, contactless ?? Off, atm ?? On, international ?? Off)));
 
     [Fact]
     public async Task New_card_works_at_shops_but_online_only_after_the_cardholder_switches_it_on()
@@ -111,7 +103,7 @@ public class CardControlFlowTests
         Assert.Equal(0, (await _db.CreditCards.SingleAsync()).FailedPinAttempts);
         await _transactions.LoadAsync(new LoadRequest(card.Card.CardId, 100m));     // repaying still works
 
-        Assert.False((await _sut.UnlockAsync(card.Card.CardId)).IsLocked);
+        Assert.False((await _services.Otp.ApproveAsync(() => _sut.UnlockAsync(card.Card.CardId))).IsLocked);
         Assert.True((await Swipe(card, 10m)).Approved);
     }
 

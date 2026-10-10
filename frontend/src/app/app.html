@@ -1,5 +1,5 @@
 <nav class="navbar navbar-expand navbar-dark bg-primary mb-4">
-  <div class="container">
+  <div class="container-fluid px-lg-4">
     <a class="navbar-brand fw-semibold" routerLink="/">Secure Credit EMI</a>
 
     @if (auth.isLoggedIn()) {
@@ -15,11 +15,31 @@
         <li class="nav-item"><a class="nav-link" routerLink="/pay" routerLinkActive="active">Checkout simulator</a></li>
         <li class="nav-item"><a class="nav-link" routerLink="/emi-calculator" routerLinkActive="active">EMI calculator</a></li>
       </ul>
-      <span class="navbar-text text-white me-3">
-        {{ auth.currentUser()?.fullName }}
+      <a class="nav-link text-white position-relative me-3" routerLink="/notifications" routerLinkActive="active"
+         [attr.aria-label]="'Notifications, ' + notifications.unreadCount() + ' unread'" title="Notifications">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zm.995-14.901a1 1 0 1 0-1.99 0A5.002 5.002 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901z"/>
+        </svg>
+        @if (notifications.unreadCount() > 0) {
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+            {{ notifications.unreadCount() > 99 ? '99+' : notifications.unreadCount() }}
+          </span>
+        }
+      </a>
+      <span class="navbar-text text-white me-3" [title]="auth.currentUser()?.fullName ?? ''">
+        <span class="d-none d-xxl-inline">{{ auth.currentUser()?.fullName }}</span>
         <span class="badge bg-light text-primary ms-1">{{ auth.currentUser()?.role }}</span>
       </span>
       <button class="btn btn-outline-light btn-sm" (click)="auth.logout()">Logout</button>
+    }
+    @if (devMode) {
+      <a class="btn btn-warning btn-sm ms-2" [class.ms-auto]="!auth.isLoggedIn()" routerLink="/dev/phone"
+         title="Phone simulator (development only): SMS and e-mails the API sent" aria-label="Phone simulator (development only)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M11 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h6zM5 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H5z"/>
+          <path d="M8 14a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
+        </svg>
+      </a>
     }
   </div>
 </nav>
@@ -27,3 +47,6 @@
 <main class="container pb-5">
   <router-outlet />
 </main>
+
+<!-- Module 7: one-time-code dialog, opened by the OTP interceptor for any protected request -->
+<app-otp-dialog />

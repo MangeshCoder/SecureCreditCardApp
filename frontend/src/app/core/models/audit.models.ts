@@ -1,4 +1,5 @@
-export type AuditOutcome = 'Success' | 'Rejected' | 'Failed';
+/** Challenged (Module 7): answered with 428 - a one-time code was sent first. */
+export type AuditOutcome = 'Success' | 'Rejected' | 'Failed' | 'Challenged';
 
 export interface AuditLog {
   auditId: number;
