@@ -17,7 +17,7 @@ Each module ends with a working, tested application, so you always have somethin
 
 | Module | What you build | Why |
 |---|---|---|
-| **6. Card Controls & Spending Limits** | Switch online, international, contactless and ATM use on/off per card; daily and per-transaction limits; temporary self-lock; enforced on every swipe path, including the gateway | Every bank's card app has it; RBI rules require these controls |
+| **[6. Card Controls & Spending Limits](06-Module-6-Card-Controls.md)** ✅ | Switch POS, online, contactless, ATM and international use on/off per card (RBI defaults for new cards); optional daily limit per channel and abroad; ₹5,000 contactless cap; temporary self-lock; enforced on every swipe path, including the gateway. New table `CardControls` | Every bank's card app has it; RBI rules require these controls |
 | **7. OTP / Two-Factor Authentication + Notifications** | One-time passwords for sensitive actions (PIN change, card number reveal, limit changes), in-app/e-mail alerts for every transaction | Stops account takeover with a stolen password; the customer sees every spend immediately |
 | **8. Billing Cycle & Statements** | Monthly statement, minimum amount due, due date, late fee, interest on unpaid balance, PDF download | The core of how a credit card actually charges the customer |
 | **9. EMI Extras** | Processing fee + GST on EMI conversion, foreclosure (close an EMI early), Key Fact Statement shown before conversion | Real EMI products disclose total cost up front and allow early closure |

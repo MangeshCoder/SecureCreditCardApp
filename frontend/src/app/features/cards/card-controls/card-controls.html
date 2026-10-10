@@ -1,0 +1,109 @@
+<a class="small" [routerLink]="auth.isAdmin() ? '/admin/cards' : '/cards'">&larr; Back to cards</a>
+<div class="d-flex align-items-center mt-2 mb-4">
+  <h1 class="h3 mb-0 me-auto">Card controls</h1>
+  @if (controls(); as c) {
+    <span class="font-monospace">{{ c.maskedCardNumber }}</span>
+  }
+</div>
+
+@if (message()) {
+  <div class="alert alert-success alert-dismissible">
+    {{ message() }}
+    <button type="button" class="btn-close" (click)="message.set(null)"></button>
+  </div>
+}
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+@if (controls(); as c) {
+  @if (auth.isAdmin()) {
+    <div class="alert alert-info py-2">Read-only: only the cardholder can change these settings. The bank uses Block / Unblock.</div>
+  } @else if (c.cardStatus !== 'Active') {
+    <div class="alert alert-warning py-2">This card is blocked by the bank, so its controls cannot be changed.</div>
+  }
+
+  <!-- Temporary lock -->
+  <div class="card shadow-sm mb-4" [class.border-warning]="c.isLocked">
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+      <div class="me-auto">
+        <h2 class="h5 mb-1">
+          Temporary lock
+          @if (c.isLocked) { <span class="badge bg-warning text-dark ms-1">Locked</span> }
+        </h2>
+        @if (c.isLocked) {
+          <p class="mb-0 text-muted small">
+            Locked since {{ c.lockedAt | date: 'medium' }}. Every purchase is declined. Paying your bill still works.
+          </p>
+        } @else {
+          <p class="mb-0 text-muted small">
+            Can't find your card? Lock it instantly and unlock it yourself when you find it.
+            If it was stolen, block it instead (only the bank can unblock).
+          </p>
+        }
+      </div>
+      @if (!readOnly()) {
+        @if (c.isLocked) {
+          <button class="btn btn-success" (click)="unlock()">Unlock card</button>
+        } @else {
+          <button class="btn btn-warning" (click)="lock()">Lock card</button>
+        }
+      }
+    </div>
+  </div>
+
+  <!-- Channels and limits -->
+  <form class="card shadow-sm" [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <div class="card-body">
+      <h2 class="h5">Where your card works</h2>
+      <p class="text-muted small">
+        New cards only work with chip + PIN at shops and ATMs in India (RBI rule). Switch on what you need.
+        A daily limit is optional; empty means no extra limit, only your available credit.
+      </p>
+
+      <ul class="list-group list-group-flush">
+        @for (row of rows; track row.key) {
+          <li class="list-group-item px-0" [formGroupName]="row.key">
+            <div class="row g-2 align-items-center">
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" [id]="'sw-' + row.key" formControlName="enabled">
+                  <label class="form-check-label fw-semibold" [for]="'sw-' + row.key">{{ row.name }}</label>
+                </div>
+                <div class="small text-muted ms-5">
+                  {{ row.description }}
+                  @if (row.key === 'contactless') {
+                    Up to {{ c.contactlessPerTransactionLimit | currency: currency : 'symbol' : '1.0-0' }} per payment.
+                  }
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">Daily limit</span>
+                  <input type="number" class="form-control" formControlName="dailyLimit" placeholder="No limit" min="1"
+                         [attr.aria-label]="row.name + ' daily limit'" [class.is-invalid]="invalid(row.key)">
+                </div>
+              </div>
+              <div class="col-md-3 small">
+                <div class="text-muted">Spent today: {{ c[row.key].spentToday | currency: currency }}</div>
+                @if (c[row.key].dailyLimit) {
+                  <div class="progress mt-1" style="height: 6px" role="progressbar"
+                       [attr.aria-valuenow]="usedPercent(row.key)" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar" [class.bg-danger]="usedPercent(row.key) >= 90" [style.width.%]="usedPercent(row.key)"></div>
+                  </div>
+                }
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+
+      @if (!readOnly()) {
+        <div class="d-flex align-items-center gap-3 mt-3">
+          <button class="btn btn-primary" type="submit" [disabled]="busy()">{{ busy() ? 'Saving…' : 'Save controls' }}</button>
+          <span class="small text-muted">Last changed {{ c.updatedAt | date: 'medium' }}</span>
+        </div>
+      }
+    </div>
+  </form>
+}

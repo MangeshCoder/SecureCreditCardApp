@@ -17,6 +17,7 @@ public class AppDbContext : DbContext, IUnitOfWork
 
     public DbSet<Cardholder> Cardholders => Set<Cardholder>();
     public DbSet<CreditCard> CreditCards => Set<CreditCard>();
+    public DbSet<CardControl> CardControls => Set<CardControl>();
     public DbSet<CardTransaction> Transactions => Set<CardTransaction>();
     public DbSet<CashbackLog> CashbackLogs => Set<CashbackLog>();
     public DbSet<EmiPlan> EmiPlans => Set<EmiPlan>();

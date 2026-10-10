@@ -24,6 +24,17 @@ public sealed class AuditAttribute : TypeFilterAttribute
     }
 }
 
+/// <summary>Lets an action add a short summary of what it changed to its audit row (never secrets).</summary>
+public static class AuditDetail
+{
+    private const string ItemKey = "SecureEmiCard.AuditDetail";
+
+    public static void SetAuditDetail(this HttpContext http, string detail) => http.Items[ItemKey] = detail;
+
+    internal static string? GetAuditDetail(this HttpContext http) =>
+        http.Items.TryGetValue(ItemKey, out var value) ? value as string : null;
+}
+
 public class AuditActionFilter : IAsyncActionFilter
 {
     private readonly string _actionType;
@@ -55,7 +66,7 @@ public class AuditActionFilter : IAsyncActionFilter
                 IStatusCodeActionResult { StatusCode: { } code } => code,
                 _ => http.Response.StatusCode
             };
-            detail = null;
+            detail = http.GetAuditDetail(); // e.g. Module 6: "Online on (limit 20000.00) ..."
         }
 
         var outcome = status switch

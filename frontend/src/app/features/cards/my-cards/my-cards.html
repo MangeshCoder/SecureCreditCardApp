@@ -21,10 +21,14 @@
 <div class="row g-4">
   @for (card of cards(); track card.cardId) {
     <div class="col-lg-6">
-      <div class="credit-card p-4 shadow" [class.blocked]="card.cardStatus === 'Blocked'">
+      <div class="credit-card p-4 shadow" [class.blocked]="card.cardStatus === 'Blocked'"
+           [class.locked]="card.isLocked && card.cardStatus === 'Active'">
         <div class="d-flex justify-content-between">
           <span class="fw-semibold">Secure Credit EMI</span>
-          <span class="badge" [class]="card.cardStatus === 'Active' ? 'bg-success' : 'bg-danger'">{{ card.cardStatus }}</span>
+          <span>
+            @if (card.isLocked) { <span class="badge bg-warning text-dark me-1">Locked</span> }
+            <span class="badge" [class]="card.cardStatus === 'Active' ? 'bg-success' : 'bg-danger'">{{ card.cardStatus }}</span>
+          </span>
         </div>
         <div class="card-number my-4">
           {{ revealed()?.cardId === card.cardId ? revealed()!.number : card.maskedCardNumber }}
@@ -58,13 +62,21 @@
           </div>
 
           @if (card.cardStatus === 'Active') {
+            @if (card.isLocked) {
+              <div class="alert alert-warning py-2 small">
+                Locked by you: every purchase is declined. Paying your bill still works.
+              </div>
+            }
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-outline-primary btn-sm" (click)="open(card.cardId, 'reveal')">Show card number</button>
               <button class="btn btn-outline-secondary btn-sm" (click)="open(card.cardId, 'pin')">Change PIN</button>
               <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', card.cardId, 'transactions']">Statement / Pay bill</a>
               <a class="btn btn-outline-success btn-sm" [routerLink]="['/cards', card.cardId, 'rewards']">Rewards</a>
               <a class="btn btn-outline-primary btn-sm" [routerLink]="['/cards', card.cardId, 'emi']">EMI</a>
-              <button class="btn btn-outline-danger btn-sm ms-auto" (click)="block(card)">Block card</button>
+              <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/cards', card.cardId, 'controls']">Card controls</a>
+              <button class="btn btn-sm ms-auto" [class]="card.isLocked ? 'btn-success' : 'btn-outline-warning'"
+                      (click)="toggleLock(card)">{{ card.isLocked ? 'Unlock card' : 'Lock card' }}</button>
+              <button class="btn btn-outline-danger btn-sm" (click)="block(card)">Block card</button>
             </div>
           } @else {
             <div class="d-flex align-items-center gap-2">

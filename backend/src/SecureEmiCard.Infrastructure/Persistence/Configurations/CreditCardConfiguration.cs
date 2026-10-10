@@ -30,6 +30,14 @@ public class CreditCardConfiguration : IEntityTypeConfiguration<CreditCard>
         b.Property(x => x.CardStatus).HasConversion<string>().HasMaxLength(20).IsRequired();
         b.Property(x => x.ExpiryDate).HasColumnType("date");
         b.Property(x => x.CreatedAt).HasColumnType("datetime2");
+        b.Property(x => x.LockedAt).HasColumnType("datetime2");
+
+        // Module 6: the card's controls live in their own table, keyed by the same CardId.
+        b.HasOne(x => x.Controls)
+         .WithOne()
+         .HasForeignKey<CardControl>(x => x.CardId)
+         .HasConstraintName("FK_CardControls_CreditCards")
+         .OnDelete(DeleteBehavior.Cascade);
 
         b.HasIndex(x => x.CardholderId).HasDatabaseName("IX_CreditCards_CardholderId");
 

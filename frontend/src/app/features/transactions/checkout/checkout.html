@@ -30,6 +30,30 @@
             </div>
           </div>
 
+          <h2 class="h6 text-uppercase text-muted">Where and how</h2>
+          <div class="row g-2 mb-1">
+            <div class="col-sm-7">
+              <label class="form-label" for="channel">Channel</label>
+              <select id="channel" class="form-select" formControlName="channel" (change)="channelChanged()">
+                @for (c of channels; track c.value) {
+                  <option [value]="c.value">{{ c.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="col-sm-5">
+              <label class="form-label" for="country">Merchant country</label>
+              <select id="country" class="form-select" formControlName="merchantCountry">
+                @for (c of countries; track c.code) {
+                  <option [value]="c.code">{{ c.name }} ({{ c.code }})</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="form-text mb-3">
+            New cards work only at shops and ATMs in India. Online, contactless and international use are
+            switched on by the cardholder under My cards &rarr; Card controls.
+          </div>
+
           <h2 class="h6 text-uppercase text-muted">Card</h2>
           <div class="mb-2">
             <label class="form-label" for="number">Card number</label>
@@ -72,6 +96,9 @@
           </div>
           @if (!r.approved) {
             <p class="fw-semibold">{{ r.declineReason }}</p>
+            @if (isControlDecline(r.declineReason)) {
+              <p class="small text-muted">The cardholder can change this under My cards &rarr; Card controls.</p>
+            }
           }
           <dl class="row text-start small mb-0">
             <dt class="col-6">Amount</dt><dd class="col-6">{{ r.amount | currency: currency }}</dd>

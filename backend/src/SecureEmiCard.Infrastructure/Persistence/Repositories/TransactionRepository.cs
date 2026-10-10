@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SecureEmiCard.Application.Abstractions.Persistence;
+using SecureEmiCard.Domain.Common;
 using SecureEmiCard.Domain.Entities;
 using SecureEmiCard.Domain.Enums;
 
@@ -39,6 +40,24 @@ public class TransactionRepository : ITransactionRepository
                              && t.TransactionDate >= sinceUtc)
                  .OrderByDescending(t => t.TransactionDate)
                  .ToListAsync(ct);
+
+    public async Task<DailySpend> GetApprovedSpendAsync(int cardId, DateTime sinceUtc, CancellationToken ct = default)
+    {
+        // One small GROUP BY in SQL (uses IX_Transactions_CardId_Date); at most 8 rows come back.
+        var rows = await _db.Transactions.AsNoTracking()
+            .Where(t => t.CardId == cardId
+                        && t.TransactionType == TransactionType.Swipe
+                        && t.TransactionStatus != TransactionStatus.Declined
+                        && t.TransactionDate >= sinceUtc
+                        && t.Channel != null)
+            .GroupBy(t => new { t.Channel, t.IsInternational })
+            .Select(g => new { g.Key.Channel, g.Key.IsInternational, Amount = g.Sum(t => t.Amount) })
+            .ToListAsync(ct);
+
+        return new DailySpend(
+            rows.GroupBy(r => r.Channel!.Value).ToDictionary(g => g.Key, g => g.Sum(r => r.Amount)),
+            rows.Where(r => r.IsInternational).Sum(r => r.Amount));
+    }
 
     public async Task AddAsync(CardTransaction transaction, CancellationToken ct = default) =>
         await _db.Transactions.AddAsync(transaction, ct);

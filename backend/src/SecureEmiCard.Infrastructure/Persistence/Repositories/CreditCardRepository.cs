@@ -10,11 +10,12 @@ public class CreditCardRepository : ICreditCardRepository
 
     public CreditCardRepository(AppDbContext db) => _db = db;
 
+    // Single-card reads include the controls (Module 6): every swipe needs them.
     public Task<CreditCard?> GetByIdAsync(int cardId, CancellationToken ct = default) =>
-        _db.CreditCards.FirstOrDefaultAsync(c => c.CardId == cardId, ct);
+        _db.CreditCards.Include(c => c.Controls).FirstOrDefaultAsync(c => c.CardId == cardId, ct);
 
     public Task<CreditCard?> GetByNumberHashAsync(string cardNumberHash, CancellationToken ct = default) =>
-        _db.CreditCards.FirstOrDefaultAsync(c => c.CardNumberHash == cardNumberHash, ct);
+        _db.CreditCards.Include(c => c.Controls).FirstOrDefaultAsync(c => c.CardNumberHash == cardNumberHash, ct);
 
     public Task<bool> NumberHashExistsAsync(string cardNumberHash, CancellationToken ct = default) =>
         _db.CreditCards.AnyAsync(c => c.CardNumberHash == cardNumberHash, ct);

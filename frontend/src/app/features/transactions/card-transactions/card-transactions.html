@@ -1,6 +1,7 @@
 <a class="small" [routerLink]="auth.isAdmin() ? '/admin/cards' : '/cards'">&larr; Back to cards</a>
 <div class="d-flex align-items-center mt-2 mb-4">
   <h1 class="h3 mb-0 me-auto">Card statement</h1>
+  <a class="btn btn-outline-secondary btn-sm me-2" [routerLink]="['/cards', cardId(), 'controls']">Card controls</a>
   <a class="btn btn-outline-primary btn-sm me-2" [routerLink]="['/cards', cardId(), 'emi']">EMI plans</a>
   <a class="btn btn-outline-success btn-sm" [routerLink]="['/cards', cardId(), 'rewards']">Cashback rewards</a>
 </div>
@@ -22,6 +23,7 @@
         <div class="col-md-3">
           <div class="font-monospace fw-semibold">{{ c.maskedCardNumber }}</div>
           <span class="badge" [class]="c.cardStatus === 'Active' ? 'bg-success' : 'bg-danger'">{{ c.cardStatus }}</span>
+          @if (c.isLocked) { <span class="badge bg-warning text-dark ms-1">Locked</span> }
         </div>
         <div class="col-md-2 text-center">
           <div class="small text-muted">Credit limit</div>
@@ -73,6 +75,12 @@
             <td>{{ t.transactionDate | date: 'medium' }}</td>
             <td>
               {{ t.merchantName }} <span class="small text-muted">MCC {{ t.merchantCategoryCode }}</span>
+              @if (t.channel) {
+                <span class="badge text-bg-light border ms-1">{{ channelLabels[t.channel] }}</span>
+              }
+              @if (t.isInternational) {
+                <span class="badge text-bg-info ms-1" title="International">{{ t.merchantCountry }}</span>
+              }
               @if (t.declineReason) { <div class="small text-danger">{{ t.declineReason }}</div> }
               @if (t.cashbackEarned) {
                 <div class="small" [class.text-success]="!t.cashbackReversed" [class.text-muted]="t.cashbackReversed">

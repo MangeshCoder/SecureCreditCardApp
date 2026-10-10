@@ -35,6 +35,7 @@ public class CreditCard
         CardStatus = CardStatus.Active;
         ExpiryDate = expiryDate;
         CreatedAt = DateTime.UtcNow;
+        Controls = CardControl.CreateDefault(); // Module 6: saved together with the card
     }
 
     public int CardId { get; private set; }
@@ -51,8 +52,12 @@ public class CreditCard
     public DateOnly ExpiryDate { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public int FailedPinAttempts { get; private set; }
+    /// <summary>Module 6: temporarily locked by the cardholder (unlike Blocked, the cardholder can undo it).</summary>
+    public bool IsLocked { get; private set; }
+    public DateTime? LockedAt { get; private set; }
 
     public Cardholder? Cardholder { get; private set; }
+    public CardControl? Controls { get; private set; }
 
     /// <summary>
     /// Amount currently owed on the card (dynamic balance calculation).
@@ -117,6 +122,7 @@ public class CreditCard
     {
         if (CardStatus == CardStatus.Blocked) return DeclineReasons.CardBlocked;
         if (IsExpired) return DeclineReasons.CardExpired;
+        if (IsLocked) return DeclineReasons.CardLocked;
         if (amount > AvailableBalance) return DeclineReasons.InsufficientCredit;
         return null;
     }
@@ -183,6 +189,37 @@ public class CreditCard
     {
         if (principal < 0) throw new DomainException("Principal cannot be negative.");
         AvailableBalance += principal;
+    }
+
+    // ---- Module 6: card controls --------------------------------------------------------
+
+    /// <summary>
+    /// The card's controls. Cards issued before Module 6 that have no CardControls row yet get the
+    /// defaults here; EF Core inserts that row with the next SaveChanges.
+    /// </summary>
+    public CardControl EnsureControls() => Controls ??= CardControl.CreateDefault();
+
+    /// <summary>Lock first, then the channel and international switches.</summary>
+    public string? GetUsageDeclineReason(TransactionChannel channel, bool isInternational) =>
+        IsLocked ? DeclineReasons.CardLocked : EnsureControls().GetUsageDeclineReason(channel, isInternational);
+
+    /// <summary>
+    /// Temporary lock by the cardholder ("I can't find my card"). Every swipe is declined until they
+    /// unlock it. Repayments and refunds still work - only spending is stopped.
+    /// </summary>
+    public void Lock()
+    {
+        if (CardStatus == CardStatus.Blocked) throw new DomainException("A blocked card cannot be locked.");
+        if (IsLocked) throw new DomainException("Card is already locked.");
+        IsLocked = true;
+        LockedAt = DateTime.UtcNow;
+    }
+
+    public void Unlock()
+    {
+        if (!IsLocked) throw new DomainException("Card is not locked.");
+        IsLocked = false;
+        LockedAt = null;
     }
 
     // ---- Module 2: PIN lockout ----------------------------------------------------------

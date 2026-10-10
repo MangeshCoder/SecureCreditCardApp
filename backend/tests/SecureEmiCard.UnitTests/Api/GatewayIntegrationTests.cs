@@ -193,6 +193,27 @@ public class GatewayIntegrationTests : IClassFixture<SecureEmiApiFactory>
     }
 
     [Fact]
+    public async Task Card_controls_apply_to_partner_bank_requests_too()
+    {
+        // Module 6: a partner bank sends channel + country; the cardholder never switched on online use.
+        var card = await _api.CreateCustomerWithCardAsync($"ctl-{Guid.NewGuid():N}@test.com");
+        var request = Sign(new
+        {
+            card.CardNumber, ExpiryMonth = card.Card.ExpiryDate.Month, ExpiryYear = card.Card.ExpiryDate.Year,
+            card.Cvv, Pin = card.InitialPin, MerchantName = "Amazon US", MerchantCategoryCode = "5732",
+            Amount = 1_000m, Channel = "Online", MerchantCountry = "US"
+        });
+
+        var result = await ReadSecureAsync<SwipeResponse>(await SendAsync(request), request);
+
+        Assert.False(result.Approved);
+        Assert.Equal(DeclineReasons.ChannelDisabled(TransactionChannel.Online), result.DeclineReason);
+        var stored = await InDbAsync(db => db.Transactions.SingleAsync(t => t.TransactionId == result.TransactionId));
+        Assert.True(stored.IsInternational);
+        Assert.Equal(request.Signature, stored.DigitalSignature);
+    }
+
+    [Fact]
     public async Task Validation_errors_are_returned_inside_the_secure_channel()
     {
         var card = await _api.CreateCustomerWithCardAsync($"val-{Guid.NewGuid():N}@test.com");

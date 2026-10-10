@@ -10,6 +10,8 @@ export interface Card {
   cardStatus: CardStatus;
   expiryDate: string;
   createdAt: string;
+  /** Module 6: temporarily locked by the cardholder (they can unlock it themselves). */
+  isLocked: boolean;
 }
 
 export interface IssueCardRequest {

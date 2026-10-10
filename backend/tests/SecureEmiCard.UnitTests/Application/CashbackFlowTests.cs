@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common.Exceptions;
 using SecureEmiCard.Application.Features.Cards;
+using SecureEmiCard.Application.Features.CardControls;
 using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Features.Transactions;
 using SecureEmiCard.Domain.Common;
@@ -51,6 +52,7 @@ public class CashbackFlowTests
             new ChangePinRequestValidator(), new RevealCardNumberRequestValidator());
         _transactions = new TransactionService(new CreditCardRepository(_db), new TransactionRepository(_db),
             new CashbackRepository(_db), engine, new EmiPlanRepository(_db), _db, lookup, hasher, _user,
+            new CardControlRules(Options.Create(new CardControlOptions())),
             new SwipeRequestValidator(), new LoadRequestValidator());
         _sut = new CashbackService(engine, new CashbackRepository(_db), new CreditCardRepository(_db), _user);
     }
