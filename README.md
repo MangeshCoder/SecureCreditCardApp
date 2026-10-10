@@ -23,6 +23,7 @@ SecureCreditCardApp/
 │   └── tests/SecureEmiCard.UnitTests     xUnit tests
 ├── database/                        SQL Server scripts (source of truth for the schema)
 ├── frontend/                        Angular client
+├── tools/PartnerBankSimulator/      Console app that plays a partner bank calling the gateway (Module 5)
 └── docs/                            Step-by-step guide, one document per module
 ```
 
@@ -34,8 +35,14 @@ SecureCreditCardApp/
 | 2 | [Merchant Swipe & Load Operations (transactions ledger)](docs/02-Module-2-Swipe-and-Load.md) | ✅ Done |
 | 3 | [Automated Cashback Reward Engine](docs/03-Module-3-Cashback.md) | ✅ Done |
 | 4 | [EMI Conversion Engine (amortization + schedules)](docs/04-Module-4-Emi.md) | ✅ Done |
-| 5 | Inter-Bank Payload Security (AES payload encryption + HMAC signatures + audit log) | ⏳ Next |
-| 6 | Deployment (Docker, Azure App Service, Key Vault, CI/CD) | ⏳ |
+| 5 | [Inter-Bank Payload Security + Security Audit Log](docs/05-Module-5-InterBank-Security-Audit.md) | ✅ Done |
+| 6 | Card controls & spending limits (online / international / contactless, temporary lock) | ⏳ Next |
+| 7 | OTP / two-factor authentication + notifications | ⏳ |
+| 8 | Billing cycle & statements (minimum due, due date, late fee, interest, PDF) | ⏳ |
+| 9 | EMI extras (processing fee + GST, foreclosure, Key Fact Statement) | ⏳ |
+| 10 | Fraud detection rules | ⏳ |
+| 11 | Rewards 2.0 (points, milestones, redemption) | ⏳ |
+| 12 | Deployment (Docker, Azure App Service, Key Vault, CI/CD) | ⏳ |
 
 See [docs/00-Roadmap.md](docs/00-Roadmap.md) for the full plan.
 
@@ -49,6 +56,7 @@ sqlcmd -S localhost -E -i database/01a_Database_Schema_Core_Tables.sql
 sqlcmd -S localhost -E -i database/02_Module2_Transactions.sql
 sqlcmd -S localhost -E -i database/03_Module3_Cashback.sql
 sqlcmd -S localhost -E -i database/04_Module4_Emi.sql
+sqlcmd -S localhost -E -i database/05_Module5_Security_Audit.sql
 
 # 2. API  -> http://localhost:5080/swagger
 cd backend
