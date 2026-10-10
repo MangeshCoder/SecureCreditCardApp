@@ -26,6 +26,7 @@ public class AppDbContext : DbContext, IUnitOfWork
     public DbSet<SecurityAuditLog> SecurityAuditLogs => Set<SecurityAuditLog>();
     public DbSet<OtpChallenge> OtpChallenges => Set<OtpChallenge>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<CardStatement> CardStatements => Set<CardStatement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using SecureEmiCard.Application.Abstractions.Messaging;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common.Exceptions;
+using SecureEmiCard.Application.Features.Billing;
 using SecureEmiCard.Application.Features.CardControls;
 using SecureEmiCard.Application.Features.Cards;
 using SecureEmiCard.Application.Features.Cashback;
@@ -9,6 +10,7 @@ using SecureEmiCard.Application.Features.Emi;
 using SecureEmiCard.Application.Features.Notifications;
 using SecureEmiCard.Application.Features.Otp;
 using SecureEmiCard.Application.Features.Transactions;
+using SecureEmiCard.Infrastructure.Billing;
 using SecureEmiCard.Infrastructure.Persistence;
 using SecureEmiCard.Infrastructure.Persistence.Repositories;
 using SecureEmiCard.Infrastructure.Security;
@@ -35,6 +37,10 @@ internal sealed class TestServices
     public PepperedSecretHasher Hasher { get; } = new(TestKeys.Encryption(), iterations: 1_000);
     public HmacCardLookupHasher Lookup { get; } = new(TestKeys.Encryption());
     public CardControlRules ControlRules { get; } = new(Options.Create(new CardControlOptions()));
+    public BillingOptions BillingOptions { get; } = new();
+    public BillingCalculator Billing => new(Options.Create(BillingOptions));
+    /// <summary>Billing's clock - move it forward to reach a due date without waiting.</summary>
+    public ShiftedClock Clock { get; } = new();
 
     public StepUpAuthenticator StepUp() =>
         new(new OtpChallengeRepository(_db), new CardholderRepository(_db), _db, Hasher, Otp, Otp, Options.Create(OtpOptions));
@@ -51,17 +57,32 @@ internal sealed class TestServices
     public TransactionService Transactions(ICashbackEngine? cashback = null) =>
         new(new CreditCardRepository(_db), new TransactionRepository(_db), new CashbackRepository(_db),
             cashback ?? new CashbackEngine(Options.Create(new CashbackOptions())), new EmiPlanRepository(_db), _db,
-            Lookup, Hasher, _user, ControlRules, StepUp(), Notifier(),
+            Lookup, Hasher, _user, ControlRules, StepUp(), Notifier(), Billing,
             new SwipeRequestValidator(), new LoadRequestValidator());
 
     public CardControlService CardControls() =>
         new(new CreditCardRepository(_db), new TransactionRepository(_db), _db, _user, ControlRules,
             new UpdateCardControlsRequestValidator(), StepUp(), Notifier());
 
+    public BillingService BillingService() =>
+        new(new CreditCardRepository(_db), new CardStatementRepository(_db), new TransactionRepository(_db),
+            new CashbackRepository(_db), new EmiPlanRepository(_db), _db, _user, Notifier(), Billing,
+            new QuestPdfStatementRenderer(), ControlRules, Clock);
+
     public EmiService Emi() =>
         new(new EmiCalculator(Options.Create(new EmiOptions())), new EmiPlanRepository(_db), new TransactionRepository(_db),
             new CreditCardRepository(_db), _db, _user, Notifier(),
             new EmiPreviewRequestValidator(), new ConvertToEmiRequestValidator());
+}
+
+/// <summary>The real time plus an offset: "it is now 21 days later" for the billing code.</summary>
+internal sealed class ShiftedClock : TimeProvider
+{
+    public TimeSpan Offset { get; set; }
+
+    public void Advance(TimeSpan by) => Offset += by;
+
+    public override DateTimeOffset GetUtcNow() => DateTimeOffset.UtcNow + Offset;
 }
 
 /// <summary>

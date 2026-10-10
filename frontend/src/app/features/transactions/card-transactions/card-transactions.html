@@ -1,6 +1,7 @@
 <a class="small" [routerLink]="auth.isAdmin() ? '/admin/cards' : '/cards'">&larr; Back to cards</a>
 <div class="d-flex align-items-center mt-2 mb-4">
-  <h1 class="h3 mb-0 me-auto">Card statement</h1>
+  <h1 class="h3 mb-0 me-auto">Transactions</h1>
+  <a class="btn btn-outline-primary btn-sm me-2" [routerLink]="['/cards', cardId(), 'statements']">Statements</a>
   <a class="btn btn-outline-secondary btn-sm me-2" [routerLink]="['/cards', cardId(), 'controls']">Card controls</a>
   <a class="btn btn-outline-primary btn-sm me-2" [routerLink]="['/cards', cardId(), 'emi']">EMI plans</a>
   <a class="btn btn-outline-success btn-sm" [routerLink]="['/cards', cardId(), 'rewards']">Cashback rewards</a>
@@ -93,7 +94,7 @@
               }
             </td>
             <td>
-              {{ t.transactionType === 'EmiInstallment' ? 'EMI payment' : t.transactionType }}
+              {{ typeLabel(t) }}
               @if (t.isEmiConverted) { <span class="badge bg-primary ms-1">EMI</span> }
             </td>
             <td><span class="badge" [class]="statusBadge(t)">{{ t.transactionStatus }}</span></td>

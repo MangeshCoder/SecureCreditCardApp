@@ -53,6 +53,13 @@
             New cards work only at shops and ATMs in India. Online, contactless and international use are
             switched on by the cardholder under My cards &rarr; Card controls.
           </div>
+          @if (form.controls.channel.value === 'Atm' && rules(); as r) {
+            <div class="alert alert-warning py-2 small">
+              Cash withdrawal fee: {{ r.cashAdvanceFeePercent }}% (at least {{ r.cashAdvanceMinimumFee | currency: currency }})
+              + {{ r.gstPercent }}% GST, charged now. Interest runs from today - cash has no interest-free period and
+              earns no cashback.
+            </div>
+          }
 
           <h2 class="h6 text-uppercase text-muted">Card</h2>
           <div class="mb-2">

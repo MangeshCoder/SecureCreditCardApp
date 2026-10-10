@@ -51,7 +51,12 @@ export class Notifications implements OnInit {
   }
 
   protected badge(category: NotificationCategory): string {
-    return category === 'Transaction' ? 'text-bg-primary' : category === 'Security' ? 'text-bg-warning' : 'text-bg-info';
+    switch (category) {
+      case 'Transaction': return 'text-bg-primary';
+      case 'Security': return 'text-bg-warning';
+      case 'Billing': return 'text-bg-success';
+      default: return 'text-bg-info';
+    }
   }
 
   protected delivery(n: AppNotification): string {

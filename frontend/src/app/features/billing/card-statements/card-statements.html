@@ -1,0 +1,186 @@
+<a class="small" [routerLink]="auth.isAdmin() ? '/admin/cards' : '/cards'">&larr; Back to cards</a>
+<div class="d-flex align-items-center flex-wrap gap-2 mt-2 mb-4">
+  <h1 class="h3 mb-0 me-auto">Statements</h1>
+  @if (card(); as c) { <span class="font-monospace me-3">{{ c.maskedCardNumber }}</span> }
+  <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', cardId(), 'transactions']">All transactions</a>
+  @if (auth.isAdmin()) {
+    <button class="btn btn-primary btn-sm" (click)="generate()" [disabled]="busy()">Generate statement now</button>
+  }
+</div>
+
+@if (message()) {
+  <div class="alert alert-success alert-dismissible">
+    {{ message() }}
+    <button type="button" class="btn-close" (click)="message.set(null)"></button>
+  </div>
+}
+@for (e of errors(); track e) {
+  <div class="alert alert-danger py-2">{{ e }}</div>
+}
+
+<!-- Your bill -->
+@if (summary(); as s) {
+  <div class="card shadow-sm mb-4" [class.border-danger]="s.isOverdue">
+    <div class="card-body">
+      @if (s.lastStatement; as st) {
+        <div class="d-flex align-items-center mb-3">
+          <h2 class="h5 mb-0 me-auto">Your bill</h2>
+          @if (s.isOverdue) {
+            <span class="badge bg-danger">Overdue</span>
+          } @else if (s.remainingTotalDue === 0) {
+            <span class="badge bg-success">Paid</span>
+          } @else if (daysLeft(st.dueDate) === 0) {
+            <span class="badge bg-warning text-dark">Due today</span>
+          } @else if (daysLeft(st.dueDate) > 0) {
+            <span class="badge bg-primary">Due in {{ daysLeft(st.dueDate) }} day(s)</span>
+          }
+        </div>
+        <div class="row text-center g-3">
+          <div class="col-6 col-md-3">
+            <div class="small text-muted">Total amount due</div>
+            <div class="fs-5 fw-semibold">{{ st.closingBalance | currency: currency }}</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="small text-muted">Minimum amount due</div>
+            <div class="fs-5 fw-semibold">{{ st.minimumDue | currency: currency }}</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="small text-muted">Payment due date</div>
+            <div class="fs-5 fw-semibold">{{ st.dueDate | date: 'mediumDate' }}</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="small text-muted">Paid since the statement</div>
+            <div class="fs-5 fw-semibold text-success">{{ s.paidSinceStatement | currency: currency }}</div>
+          </div>
+        </div>
+
+        @if (s.remainingTotalDue > 0 && !auth.isAdmin()) {
+          <div class="d-flex flex-wrap gap-2 justify-content-center mt-3">
+            @if (s.remainingMinimumDue > 0) {
+              <button class="btn btn-outline-primary" (click)="pay(s.remainingMinimumDue)" [disabled]="busy()">
+                Pay minimum {{ s.remainingMinimumDue | currency: currency }}
+              </button>
+            }
+            <button class="btn btn-primary" (click)="pay(s.remainingTotalDue)" [disabled]="busy()">
+              Pay total {{ s.remainingTotalDue | currency: currency }}
+            </button>
+          </div>
+          <p class="small text-muted text-center mt-2 mb-0">
+            Pay the minimum by the due date to avoid the late fee; pay the total to avoid interest.
+          </p>
+        }
+      } @else {
+        <h2 class="h5">Your bill</h2>
+        <p class="mb-0 text-muted">No statement yet. Your first statement is due on {{ s.nextStatementDate | date: 'mediumDate' }}.</p>
+      }
+      <hr>
+      <div class="small text-muted d-flex flex-wrap gap-4">
+        <span>Since the last statement (unbilled): <strong>{{ (s.unbilledAmount < 0 ? -s.unbilledAmount : s.unbilledAmount) | currency: currency }}{{ s.unbilledAmount < 0 ? ' Cr' : '' }}</strong></span>
+        <span>Next statement: <strong>{{ s.nextStatementDate | date: 'mediumDate' }}</strong></span>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Statements -->
+<div class="table-responsive">
+  <table class="table bg-white shadow-sm align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Statement date</th><th>Period</th><th class="text-end">Total due</th><th class="text-end">Minimum due</th>
+        <th>Due date</th><th>Status</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (st of statements(); track st.statementId) {
+        <tr>
+          <td>{{ st.periodEnd | date: 'mediumDate' }}</td>
+          <td class="small text-muted">{{ st.periodStart | date: 'd MMM' }} – {{ st.periodEnd | date: 'd MMM y' }}</td>
+          <td class="text-end fw-semibold">{{ st.closingBalance | currency: currency }}</td>
+          <td class="text-end">{{ st.minimumDue | currency: currency }}</td>
+          <td>{{ st.dueDate | date: 'mediumDate' }}</td>
+          <td><span class="badge" [class]="badge(st.status)">{{ statusText(st.status) }}</span></td>
+          <td class="text-end text-nowrap">
+            <button class="btn btn-sm btn-outline-secondary me-1" (click)="toggle(st)">
+              {{ open()?.statement?.statementId === st.statementId ? 'Hide' : 'View' }}
+            </button>
+            <button class="btn btn-sm btn-outline-primary" (click)="downloadPdf(st)">PDF</button>
+          </td>
+        </tr>
+        @if (open()?.statement?.statementId === st.statementId) {
+          @let d = open()!;
+          <tr>
+            <td colspan="7" class="bg-light">
+              <div class="row g-4 p-2">
+                <div class="col-lg-4">
+                  <h3 class="h6">Account summary</h3>
+                  <table class="table table-sm mb-0">
+                    <tbody>
+                      <tr><td>Opening balance</td><td class="text-end">{{ st.openingBalance | currency: currency }}</td></tr>
+                      <tr><td>+ Purchases</td><td class="text-end">{{ st.purchases | currency: currency }}</td></tr>
+                      <tr><td>+ Cash withdrawals</td><td class="text-end">{{ st.cashWithdrawals | currency: currency }}</td></tr>
+                      <tr><td>+ Fees, interest, GST</td><td class="text-end">{{ st.feesAndCharges | currency: currency }}</td></tr>
+                      <tr><td>− Payments</td><td class="text-end">{{ st.payments | currency: currency }}</td></tr>
+                      <tr><td>− Refunds</td><td class="text-end">{{ st.refunds | currency: currency }}</td></tr>
+                      <tr><td>− Cashback</td><td class="text-end">{{ st.cashback | currency: currency }}</td></tr>
+                      <tr><td>− Moved to EMI</td><td class="text-end">{{ st.movedToEmi | currency: currency }}</td></tr>
+                      <tr class="fw-semibold"><td>= Total due</td><td class="text-end">{{ st.closingBalance | currency: currency }}</td></tr>
+                    </tbody>
+                  </table>
+                  @if (st.emiInstallmentsDue > 0) {
+                    <div class="small text-muted mt-2">
+                      EMI installments due by the due date: {{ st.emiInstallmentsDue | currency: currency }} (paid on the EMI page).
+                    </div>
+                  }
+                  @if (st.paidByDueDate !== null) {
+                    <div class="small mt-2">Paid by the due date: <strong>{{ st.paidByDueDate | currency: currency }}</strong></div>
+                  }
+                </div>
+                <div class="col-lg-8">
+                  <h3 class="h6">Transactions</h3>
+                  <table class="table table-sm mb-0">
+                    <tbody>
+                      @for (l of d.lines; track $index) {
+                        <tr>
+                          <td class="text-nowrap small">{{ l.date | date: 'd MMM' }}</td>
+                          <td>{{ l.description }}</td>
+                          <td class="small text-muted">{{ l.kind === 'Tax' ? 'GST' : l.kind === 'Emi' ? 'EMI' : l.kind }}</td>
+                          <td class="text-end text-nowrap" [class.text-success]="l.amount < 0">
+                            {{ (l.amount < 0 ? -l.amount : l.amount) | currency: currency }}{{ l.amount < 0 ? ' Cr' : '' }}
+                          </td>
+                        </tr>
+                      } @empty {
+                        <tr><td class="text-muted">No transactions in this period.</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </td>
+          </tr>
+        }
+      } @empty {
+        <tr><td colspan="7" class="text-center text-muted">No statements yet.</td></tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+<!-- Terms -->
+@if (rules(); as r) {
+  <details class="small text-muted mt-3">
+    <summary>Billing terms</summary>
+    <ul class="mt-2">
+      <li>Payment due {{ r.paymentDueDays }} days after the statement date.</li>
+      <li>Minimum due: {{ r.minimumDuePercent }}% of the balance + all fees, interest and GST, at least {{ r.minimumDueFloor | currency: currency }}.</li>
+      <li>Interest on the unpaid part: {{ r.monthlyInterestPercent }}% a month - never on unpaid fees, interest or GST.</li>
+      <li>Cash withdrawals: {{ r.cashAdvanceFeePercent }}% fee (at least {{ r.cashAdvanceMinimumFee | currency: currency }}) and interest from day one.</li>
+      <li>GST {{ r.gstPercent }}% on fees and interest.</li>
+      <li>Late fee by unpaid balance:
+        @for (f of r.lateFees; track $index) {
+          {{ f.upTo === null ? 'above' : 'up to ' + (f.upTo | currency: currency) }}: {{ f.fee | currency: currency }}{{ $last ? '.' : ',' }}
+        }
+      </li>
+    </ul>
+  </details>
+}

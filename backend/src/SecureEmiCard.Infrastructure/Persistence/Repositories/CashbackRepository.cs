@@ -62,4 +62,16 @@ public class CashbackRepository : ICashbackRepository
         return new CashbackTotals(earned, reversed, thisMonth,
             byCategory.Select(x => (x.Mcc, x.Net, x.Count)).ToList());
     }
+
+    public async Task<IReadOnlyList<CashbackLog>> GetUnbilledAsync(int cardId, CancellationToken ct = default) =>
+        await _db.CashbackLogs.Include(c => c.Transaction)
+                 .Where(c => c.CardId == cardId && c.StatementId == null)
+                 .OrderBy(c => c.CashbackId)
+                 .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<CashbackLog>> GetByStatementAsync(int statementId, CancellationToken ct = default) =>
+        await _db.CashbackLogs.AsNoTracking().Include(c => c.Transaction)
+                 .Where(c => c.StatementId == statementId)
+                 .OrderBy(c => c.CashbackId)
+                 .ToListAsync(ct);
 }

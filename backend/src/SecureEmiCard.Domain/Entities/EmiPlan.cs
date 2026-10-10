@@ -37,6 +37,17 @@ public class EmiPlan
     public DateTime CreatedDate { get; private set; }
 
     public CardTransaction? Transaction { get; private set; }
+
+    /// <summary>Module 8: the statement that billed "moved to EMI" for this plan (null = not yet on a statement).</summary>
+    public int? StatementId { get; private set; }
+    public CardStatement? Statement { get; private set; }
+
+    /// <summary>Puts this row on a statement. Uses the navigation, so EF fills in the new statement's id.</summary>
+    public void MarkBilled(CardStatement statement)
+    {
+        if (StatementId is not null || Statement is not null) throw new DomainException("Already on a statement.");
+        Statement = statement;
+    }
     public IReadOnlyCollection<EmiSchedule> Schedules => _schedules.AsReadOnly();
 
     public decimal TotalInterest => TotalRepayable - PrincipalAmount;

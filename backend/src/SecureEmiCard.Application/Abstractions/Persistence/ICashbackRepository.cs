@@ -21,4 +21,10 @@ public interface ICashbackRepository
         int cardId, int page, int pageSize, CancellationToken ct = default);
 
     Task<CashbackTotals> GetTotalsAsync(int cardId, DateTime monthStartUtc, CancellationToken ct = default);
+
+    /// <summary>Module 8: cashback rows not on a statement yet (tracked), with the purchase loaded.</summary>
+    Task<IReadOnlyList<CashbackLog>> GetUnbilledAsync(int cardId, CancellationToken ct = default);
+
+    /// <summary>Module 8: cashback rows billed on a statement, with the purchase loaded.</summary>
+    Task<IReadOnlyList<CashbackLog>> GetByStatementAsync(int statementId, CancellationToken ct = default);
 }

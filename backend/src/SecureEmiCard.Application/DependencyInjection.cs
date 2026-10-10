@@ -5,6 +5,7 @@ using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Features.Emi;
 using SecureEmiCard.Application.Features.Notifications;
 using SecureEmiCard.Application.Features.Otp;
+using SecureEmiCard.Application.Features.Billing;
 using SecureEmiCard.Application.Features.CardControls;
 using SecureEmiCard.Application.Features.Cardholders;
 using SecureEmiCard.Application.Features.Cards;
@@ -33,6 +34,11 @@ public static class DependencyInjection
         services.AddScoped<IStepUpAuthenticator, StepUpAuthenticator>(); // scoped: remembers verified codes per request
         services.AddScoped<INotifier, Notifier>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddSingleton(TimeProvider.System); // Module 8: billing reads the time here, so tests can move it
+        services.AddSingleton<BillingCalculator>();
+        services.AddScoped<BillingService>();
+        services.AddScoped<IBillingService>(sp => sp.GetRequiredService<BillingService>());
+        services.AddScoped<IBillingCycleRunner>(sp => sp.GetRequiredService<BillingService>());
         services.AddSingleton<ICardNumberGenerator, CardNumberGenerator>();
 
         return services;

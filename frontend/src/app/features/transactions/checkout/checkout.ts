@@ -2,7 +2,9 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { environment } from '../../../../environments/environment';
+import { BillingRules } from '../../../core/models/billing.models';
 import { MerchantCategory, SwipeResponse, TransactionChannel } from '../../../core/models/transaction.models';
+import { BillingService } from '../../../core/services/billing.service';
 import { TransactionService } from '../../../core/services/transaction.service';
 import { apiErrorMessages } from '../../../core/utils/api-error';
 
@@ -19,9 +21,12 @@ const CASH_MCC = '6011';
 })
 export class Checkout implements OnInit {
   private readonly transactions = inject(TransactionService);
+  private readonly billing = inject(BillingService);
 
   protected readonly currency = environment.currencyCode;
   protected readonly categories = signal<MerchantCategory[]>([]);
+  /** Module 8: the cash-advance fee shown before an ATM withdrawal. */
+  protected readonly rules = signal<BillingRules | null>(null);
   protected readonly result = signal<SwipeResponse | null>(null);
   protected readonly errors = signal<string[]>([]);
   protected readonly busy = signal(false);
@@ -59,6 +64,7 @@ export class Checkout implements OnInit {
       next: c => this.categories.set(c),
       error: e => this.errors.set(apiErrorMessages(e))
     });
+    this.billing.rules().subscribe({ next: r => this.rules.set(r), error: () => this.rules.set(null) });
   }
 
   invalid(name: keyof typeof this.form.controls): boolean {

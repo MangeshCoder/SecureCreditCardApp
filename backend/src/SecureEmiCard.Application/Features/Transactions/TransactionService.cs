@@ -5,6 +5,7 @@ using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common;
 using SecureEmiCard.Application.Common.Exceptions;
 using SecureEmiCard.Application.Common.Models;
+using SecureEmiCard.Application.Features.Billing;
 using SecureEmiCard.Application.Features.CardControls;
 using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Features.Cards;
@@ -58,6 +59,7 @@ public class TransactionService : ITransactionService
     private readonly ICardControlRules _controlRules;
     private readonly IStepUpAuthenticator _stepUp;
     private readonly INotifier _notifier;
+    private readonly BillingCalculator _billing;
     private readonly IValidator<SwipeRequest> _swipeValidator;
     private readonly IValidator<LoadRequest> _loadValidator;
 
@@ -66,6 +68,7 @@ public class TransactionService : ITransactionService
                               IEmiPlanRepository emiPlans, IUnitOfWork unitOfWork,
                               ICardLookupHasher lookupHasher, ISecretHasher secretHasher, ICurrentUser currentUser,
                               ICardControlRules controlRules, IStepUpAuthenticator stepUp, INotifier notifier,
+                              BillingCalculator billing,
                               IValidator<SwipeRequest> swipeValidator, IValidator<LoadRequest> loadValidator)
     {
         _cards = cards;
@@ -80,6 +83,7 @@ public class TransactionService : ITransactionService
         _controlRules = controlRules;
         _stepUp = stepUp;
         _notifier = notifier;
+        _billing = billing;
         _swipeValidator = swipeValidator;
         _loadValidator = loadValidator;
     }
@@ -150,8 +154,10 @@ public class TransactionService : ITransactionService
                                                                spentToday, _controlRules.Options.ContactlessPerTransactionLimit);
         if (limit is not null) return await RecordDeclineAsync(card, r, origin, source, limit, ct);
 
-        // 6. Funds.
-        var reason = card.GetSwipeDeclineReason(r.Amount);
+        // 6. Funds. Module 8: cash comes with a fee (+ GST) charged right away, so the cash AND the fee must fit.
+        var cashFee = origin.Channel == TransactionChannel.Atm ? _billing.CashAdvanceFee(r.Amount) : 0m;
+        var cashFeeGst = _billing.Gst(cashFee);
+        var reason = card.GetSwipeDeclineReason(r.Amount + cashFee + cashFeeGst);
         if (reason is not null) return await RecordDeclineAsync(card, r, origin, source, reason, ct);
 
         // 7. Module 7: an online purchase needs a one-time code sent to the cardholder's phone (RBI "additional
@@ -170,6 +176,19 @@ public class TransactionService : ITransactionService
         var txn = CardTransaction.ApprovedSwipe(card.CardId, r.MerchantName, r.MerchantCategoryCode, r.Amount, origin);
         if (source.PartnerSignature is not null) txn.AttachDigitalSignature(source.PartnerSignature);
         await _transactions.AddAsync(txn, ct);
+        if (cashFee > 0)
+        {
+            var now = DateTime.UtcNow;
+            card.ApplyCharge(cashFee);
+            await _transactions.AddAsync(CardTransaction.Charge(card.CardId, TransactionType.Fee,
+                $"Cash advance fee - {r.MerchantName.Trim()}", cashFee, now), ct);
+            if (cashFeeGst > 0)
+            {
+                card.ApplyCharge(cashFeeGst);
+                await _transactions.AddAsync(CardTransaction.Charge(card.CardId, TransactionType.Tax,
+                    $"GST {_billing.Rules.GstPercent:0.##}% on cash advance fee", cashFeeGst, now), ct);
+            }
+        }
 
         // 9. ... + cashback (Module 3) + the alert (Module 7). All committed together by ONE SaveChanges:
         //    a swipe can never be saved without its cashback, or cashback without its swipe.
@@ -180,7 +199,7 @@ public class TransactionService : ITransactionService
             card.CreditReward(cashback.Amount);
             await _cashback.AddAsync(CashbackLog.Earned(txn, cashback.Percentage, cashback.Amount), ct);
         }
-        await _notifier.AddAsync(card, Alerts.PurchaseApproved(card, txn, cashback.Amount), ct);
+        await _notifier.AddAsync(card, Alerts.PurchaseApproved(card, txn, cashback.Amount, cashFee + cashFeeGst), ct);
 
         await _unitOfWork.SaveChangesAsync(ct);
 

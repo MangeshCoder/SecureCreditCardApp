@@ -33,12 +33,13 @@ namespace SecureEmiCard.Domain.Common
         // Money movements by the back office / customer
         public const string Refund = "Refund";
         public const string EmiConversion = "EmiConversion";
+        public const string StatementGenerated = "StatementGenerated";
 
         public static readonly IReadOnlyList<string> All = new[]
         {
             GatewayAuthorize, Login, Register, CardIssued, CardBlocked, CardUnblocked, CreditLimitChanged,
             PinChanged, CardNumberRevealed, CardLocked, CardUnlocked, CardControlsChanged,
-            CardholderActivated, CardholderDeactivated, Refund, EmiConversion
+            CardholderActivated, CardholderDeactivated, Refund, EmiConversion, StatementGenerated
         };
     }
 }

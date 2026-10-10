@@ -59,6 +59,34 @@ public class TransactionRepository : ITransactionRepository
             rows.Where(r => r.IsInternational).Sum(r => r.Amount));
     }
 
+    // ---- Module 8: billing ------------------------------------------------------------------
+
+    private static readonly TransactionType[] BilledTypes =
+    {
+        TransactionType.Swipe, TransactionType.Load, TransactionType.Refund,
+        TransactionType.Fee, TransactionType.Interest, TransactionType.Tax
+    };
+
+    public async Task<IReadOnlyList<CardTransaction>> GetUnbilledAsync(int cardId, CancellationToken ct = default) =>
+        await _db.Transactions
+                 .Where(t => t.CardId == cardId && t.StatementId == null
+                             && t.TransactionStatus != TransactionStatus.Declined && BilledTypes.Contains(t.TransactionType))
+                 .OrderBy(t => t.TransactionDate).ThenBy(t => t.TransactionId)
+                 .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<CardTransaction>> GetByStatementAsync(int statementId, CancellationToken ct = default) =>
+        await _db.Transactions.AsNoTracking()
+                 .Where(t => t.StatementId == statementId)
+                 .OrderBy(t => t.TransactionDate).ThenBy(t => t.TransactionId)
+                 .ToListAsync(ct);
+
+    public async Task<decimal> SumPaymentsAsync(int cardId, DateTime afterUtc, DateTime untilUtc, CancellationToken ct = default) =>
+        await _db.Transactions
+                 .Where(t => t.CardId == cardId && t.TransactionType == TransactionType.Load
+                             && t.TransactionStatus == TransactionStatus.Completed
+                             && t.TransactionDate > afterUtc && t.TransactionDate <= untilUtc)
+                 .SumAsync(t => t.Amount, ct);
+
     public async Task AddAsync(CardTransaction transaction, CancellationToken ct = default) =>
         await _db.Transactions.AddAsync(transaction, ct);
 }

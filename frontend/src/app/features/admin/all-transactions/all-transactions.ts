@@ -5,7 +5,7 @@ import { environment } from '../../../../environments/environment';
 import { PagedResult, Transaction } from '../../../core/models/transaction.models';
 import { TransactionService } from '../../../core/services/transaction.service';
 import { apiErrorMessages } from '../../../core/utils/api-error';
-import { CHANNEL_LABELS, signedAmount, statusBadge } from '../../transactions/transaction-badges';
+import { CHANNEL_LABELS, signedAmount, statusBadge, typeLabel } from '../../transactions/transaction-badges';
 
 /** Back office: every transaction on every card, with merchant refunds. */
 @Component({
@@ -20,6 +20,7 @@ export class AllTransactions implements OnInit {
   protected readonly statusBadge = statusBadge;
   protected readonly signedAmount = signedAmount;
   protected readonly channelLabels = CHANNEL_LABELS;
+  protected readonly typeLabel = typeLabel;
   protected readonly ledger = signal<PagedResult<Transaction> | null>(null);
   protected readonly errors = signal<string[]>([]);
   protected readonly message = signal<string | null>(null);

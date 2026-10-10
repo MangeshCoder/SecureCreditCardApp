@@ -70,7 +70,8 @@
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-outline-primary btn-sm" (click)="open(card.cardId, 'reveal')">Show card number</button>
               <button class="btn btn-outline-secondary btn-sm" (click)="open(card.cardId, 'pin')">Change PIN</button>
-              <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', card.cardId, 'transactions']">Statement / Pay bill</a>
+              <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', card.cardId, 'transactions']">Transactions / Pay bill</a>
+              <a class="btn btn-outline-primary btn-sm" [routerLink]="['/cards', card.cardId, 'statements']">Statements</a>
               <a class="btn btn-outline-success btn-sm" [routerLink]="['/cards', card.cardId, 'rewards']">Rewards</a>
               <a class="btn btn-outline-primary btn-sm" [routerLink]="['/cards', card.cardId, 'emi']">EMI</a>
               <a class="btn btn-outline-secondary btn-sm" [routerLink]="['/cards', card.cardId, 'controls']">Card controls</a>
@@ -81,7 +82,8 @@
           } @else {
             <div class="d-flex align-items-center gap-2">
               <p class="text-muted small mb-0 me-auto">This card is blocked. Contact the bank to unblock it.</p>
-              <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', card.cardId, 'transactions']">Statement / Pay bill</a>
+              <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', card.cardId, 'transactions']">Transactions / Pay bill</a>
+              <a class="btn btn-outline-dark btn-sm" [routerLink]="['/cards', card.cardId, 'statements']">Statements</a>
             </div>
           }
 
