@@ -9,7 +9,8 @@ public record CardDto(
     decimal OutstandingAmount,
     string CardStatus,
     DateOnly ExpiryDate,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    bool IsLocked);
 
 /// <summary>Admin request to issue a new card to an existing cardholder.</summary>
 public record IssueCardRequest(int CardholderId, decimal CreditLimit);

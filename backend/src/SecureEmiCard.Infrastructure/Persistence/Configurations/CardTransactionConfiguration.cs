@@ -23,6 +23,10 @@ public class CardTransactionConfiguration : IEntityTypeConfiguration<CardTransac
         b.Property(x => x.TransactionDate).HasColumnType("datetime2");
         b.Property(x => x.DigitalSignature).HasMaxLength(512);
         b.Property(x => x.DeclineReason).HasMaxLength(100);
+        // Module 6
+        b.Property(x => x.Channel).HasConversion<string>().HasMaxLength(20);
+        b.Property(x => x.MerchantCountry).HasMaxLength(2).IsFixedLength();
+        b.Ignore(x => x.IsCashWithdrawal);
 
         b.HasOne(x => x.Card)
          .WithMany()

@@ -14,6 +14,8 @@ public static class MerchantCategoryCodes
     public const string Travel = "4722";
     public const string MiscellaneousRetail = "5999";
     public const string FinancialInstitution = "6012";
+    /// <summary>ATM cash withdrawal (Module 6). Only valid with the Atm channel.</summary>
+    public const string CashWithdrawal = "6011";
 
     public static readonly IReadOnlyDictionary<string, string> Descriptions = new Dictionary<string, string>
     {
@@ -24,6 +26,7 @@ public static class MerchantCategoryCodes
         [Electronics] = "Electronics",
         [Travel] = "Travel agencies",
         [MiscellaneousRetail] = "Other retail",
+        [CashWithdrawal] = "ATM cash withdrawal",
         [FinancialInstitution] = "Financial institution (repayments)"
     };
 }

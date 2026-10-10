@@ -1,6 +1,8 @@
 using FluentValidation;
 using SecureEmiCard.Application.Features.Cards;
+using SecureEmiCard.Domain.Common;
 using SecureEmiCard.Domain.Entities;
+using SecureEmiCard.Domain.Enums;
 
 namespace SecureEmiCard.Application.Features.Transactions;
 
@@ -24,6 +26,21 @@ public class SwipeRequestValidator : AbstractValidator<SwipeRequest>
         RuleFor(x => x.MerchantName).NotEmpty().MaximumLength(CardTransaction.MaxMerchantNameLength);
         RuleFor(x => x.MerchantCategoryCode).Matches(@"^\d{4}$").WithMessage("Merchant category code must be 4 digits.");
         RuleFor(x => x.Amount).GreaterThan(0).LessThanOrEqualTo(TransactionLimits.MaxAmount).PrecisionScale(18, 2, true);
+
+        // Module 6: channel and country.
+        RuleFor(x => x.Channel).IsInEnum();
+        RuleFor(x => x.MerchantCountry)
+            .Matches("^[A-Za-z]{2}$").WithMessage("Merchant country must be a 2-letter ISO code, e.g. IN or US.")
+            .When(x => x.MerchantCountry is not null);
+        // Cash and purchases are different products: cash earns no cashback and cannot become an EMI.
+        RuleFor(x => x.MerchantCategoryCode)
+            .Equal(MerchantCategoryCodes.CashWithdrawal)
+            .WithMessage($"ATM withdrawals must use merchant category {MerchantCategoryCodes.CashWithdrawal}.")
+            .When(x => x.Channel == TransactionChannel.Atm);
+        RuleFor(x => x.Channel)
+            .Equal(TransactionChannel.Atm)
+            .WithMessage($"Merchant category {MerchantCategoryCodes.CashWithdrawal} (cash) is only valid for ATM withdrawals.")
+            .When(x => x.MerchantCategoryCode == MerchantCategoryCodes.CashWithdrawal);
     }
 }
 

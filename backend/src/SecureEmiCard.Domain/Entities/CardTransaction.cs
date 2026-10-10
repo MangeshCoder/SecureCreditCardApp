@@ -16,7 +16,8 @@ public class CardTransaction
     private CardTransaction() { }
 
     private CardTransaction(int cardId, string merchantName, string merchantCategoryCode, decimal amount,
-                            TransactionType type, TransactionStatus status, string? declineReason)
+                            TransactionType type, TransactionStatus status, string? declineReason,
+                            SwipeOrigin? origin = null)
     {
         if (amount <= 0) throw new DomainException("Transaction amount must be greater than zero.");
         if (string.IsNullOrWhiteSpace(merchantName)) throw new DomainException("Merchant name is required.");
@@ -30,6 +31,9 @@ public class CardTransaction
         TransactionStatus = status;
         DeclineReason = declineReason;
         TransactionDate = DateTime.UtcNow;
+        Channel = origin?.Channel;
+        MerchantCountry = origin?.MerchantCountry;
+        IsInternational = origin?.IsInternational ?? false;
     }
 
     public int TransactionId { get; private set; }
@@ -43,14 +47,25 @@ public class CardTransaction
     public DateTime TransactionDate { get; private set; }
     public string? DigitalSignature { get; private set; }
     public string? DeclineReason { get; private set; }
+    /// <summary>Module 6: how the card was used. Null for repayments and EMI installments.</summary>
+    public TransactionChannel? Channel { get; private set; }
+    /// <summary>Module 6: ISO 3166 alpha-2 country of the merchant (null for rows from before Module 6).</summary>
+    public string? MerchantCountry { get; private set; }
+    public bool IsInternational { get; private set; }
 
     public CreditCard? Card { get; private set; }
 
-    public static CardTransaction ApprovedSwipe(int cardId, string merchant, string mcc, decimal amount) =>
-        new(cardId, merchant, mcc, amount, TransactionType.Swipe, TransactionStatus.Completed, null);
+    public bool IsCashWithdrawal => Channel == TransactionChannel.Atm;
 
-    public static CardTransaction DeclinedSwipe(int cardId, string merchant, string mcc, decimal amount, string reason) =>
-        new(cardId, merchant, mcc, amount, TransactionType.Swipe, TransactionStatus.Declined, reason);
+    public static CardTransaction ApprovedSwipe(int cardId, string merchant, string mcc, decimal amount,
+                                                SwipeOrigin? origin = null) =>
+        new(cardId, merchant, mcc, amount, TransactionType.Swipe, TransactionStatus.Completed, null,
+            origin ?? SwipeOrigin.DomesticPos);
+
+    public static CardTransaction DeclinedSwipe(int cardId, string merchant, string mcc, decimal amount, string reason,
+                                                SwipeOrigin? origin = null) =>
+        new(cardId, merchant, mcc, amount, TransactionType.Swipe, TransactionStatus.Declined, reason,
+            origin ?? SwipeOrigin.DomesticPos);
 
     public static CardTransaction Load(int cardId, decimal amount) =>
         new(cardId, "Card repayment", MerchantCategoryCodes.FinancialInstitution, amount,
@@ -76,6 +91,7 @@ public class CardTransaction
     public string? GetEmiIneligibilityReason(decimal minimumAmount, int conversionWindowDays, DateTime nowUtc)
     {
         if (TransactionType != TransactionType.Swipe) return "Only purchases can be converted to EMI.";
+        if (IsCashWithdrawal) return "Cash withdrawals cannot be converted to EMI.";
         if (TransactionStatus == TransactionStatus.Refunded) return "A refunded purchase cannot be converted to EMI.";
         if (TransactionStatus != TransactionStatus.Completed) return "Only approved purchases can be converted to EMI.";
         if (IsEmiConverted) return "This purchase is already converted to EMI.";
@@ -97,6 +113,8 @@ public class CardTransaction
     {
         if (TransactionType != TransactionType.Swipe)
             throw new DomainException("Only swipe transactions can be refunded.");
+        if (IsCashWithdrawal)
+            throw new DomainException("A cash withdrawal cannot be refunded.");
         if (TransactionStatus != TransactionStatus.Completed)
             throw new DomainException($"A {TransactionStatus.ToString().ToLowerInvariant()} transaction cannot be refunded.");
         if (IsEmiConverted)
@@ -104,6 +122,7 @@ public class CardTransaction
 
         TransactionStatus = TransactionStatus.Refunded;
         return new CardTransaction(CardId, MerchantName, MerchantCategoryCode, Amount,
-                                   TransactionType.Refund, TransactionStatus.Completed, null);
+                                   TransactionType.Refund, TransactionStatus.Completed, null,
+                                   Channel is null ? null : new SwipeOrigin(Channel.Value, MerchantCountry, IsInternational));
     }
 }

@@ -11,7 +11,7 @@ import { EmiService } from '../../../core/services/emi.service';
 import { CardEmiSummary } from '../../../core/models/emi.models';
 import { TransactionService } from '../../../core/services/transaction.service';
 import { apiErrorMessages } from '../../../core/utils/api-error';
-import { signedAmount, statusBadge } from '../transaction-badges';
+import { CHANNEL_LABELS, signedAmount, statusBadge } from '../transaction-badges';
 
 /** Card statement: balances, "Pay bill" (load) and the paged transaction ledger. */
 @Component({
@@ -31,6 +31,7 @@ export class CardTransactions implements OnInit {
   protected readonly currency = environment.currencyCode;
   protected readonly statusBadge = statusBadge;
   protected readonly signedAmount = signedAmount;
+  protected readonly channelLabels = CHANNEL_LABELS;
 
   protected readonly card = signal<Card | null>(null);
   protected readonly ledger = signal<PagedResult<Transaction> | null>(null);

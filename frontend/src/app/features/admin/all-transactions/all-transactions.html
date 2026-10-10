@@ -24,6 +24,12 @@
             <td class="font-monospace"><a [routerLink]="['/cards', t.cardId, 'transactions']">{{ t.maskedCardNumber }}</a></td>
             <td>
               {{ t.merchantName }} <span class="small text-muted">MCC {{ t.merchantCategoryCode }}</span>
+              @if (t.channel) {
+                <span class="badge text-bg-light border ms-1">{{ channelLabels[t.channel] }}</span>
+              }
+              @if (t.isInternational) {
+                <span class="badge text-bg-info ms-1" title="International">{{ t.merchantCountry }}</span>
+              }
               @if (t.declineReason) { <div class="small text-danger">{{ t.declineReason }}</div> }
             </td>
             <td>{{ t.transactionType }}</td>
@@ -36,7 +42,7 @@
               }
             </td>
             <td class="text-end">
-              @if (t.transactionType === 'Swipe' && t.transactionStatus === 'Completed' && !t.isEmiConverted) {
+              @if (t.transactionType === 'Swipe' && t.transactionStatus === 'Completed' && !t.isEmiConverted && t.channel !== 'Atm') {
                 <button class="btn btn-sm btn-outline-warning" (click)="refund(t)">Refund</button>
               }
             </td>

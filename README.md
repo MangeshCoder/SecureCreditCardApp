@@ -36,8 +36,8 @@ SecureCreditCardApp/
 | 3 | [Automated Cashback Reward Engine](docs/03-Module-3-Cashback.md) | ✅ Done |
 | 4 | [EMI Conversion Engine (amortization + schedules)](docs/04-Module-4-Emi.md) | ✅ Done |
 | 5 | [Inter-Bank Payload Security + Security Audit Log](docs/05-Module-5-InterBank-Security-Audit.md) | ✅ Done |
-| 6 | Card controls & spending limits (online / international / contactless, temporary lock) | ⏳ Next |
-| 7 | OTP / two-factor authentication + notifications | ⏳ |
+| 6 | [Card Controls & Spending Limits (channels, international, daily limits, temporary lock)](docs/06-Module-6-Card-Controls.md) | ✅ Done |
+| 7 | OTP / two-factor authentication + notifications | ⏳ Next |
 | 8 | Billing cycle & statements (minimum due, due date, late fee, interest, PDF) | ⏳ |
 | 9 | EMI extras (processing fee + GST, foreclosure, Key Fact Statement) | ⏳ |
 | 10 | Fraud detection rules | ⏳ |
@@ -57,6 +57,7 @@ sqlcmd -S localhost -E -i database/02_Module2_Transactions.sql
 sqlcmd -S localhost -E -i database/03_Module3_Cashback.sql
 sqlcmd -S localhost -E -i database/04_Module4_Emi.sql
 sqlcmd -S localhost -E -i database/05_Module5_Security_Audit.sql
+sqlcmd -S localhost -E -i database/06_Module6_Card_Controls.sql
 
 # 2. API  -> http://localhost:5080/swagger
 cd backend

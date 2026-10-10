@@ -29,6 +29,7 @@
           <td>{{ card.expiryDate | date: 'MM/yy' }}</td>
           <td>
             <span class="badge" [class]="card.cardStatus === 'Active' ? 'bg-success' : 'bg-danger'">{{ card.cardStatus }}</span>
+            @if (card.isLocked) { <span class="badge bg-warning text-dark ms-1" title="Locked by the cardholder">Locked</span> }
           </td>
           <td class="text-end text-nowrap">
             @if (editingLimit() === card.cardId) {
@@ -38,6 +39,7 @@
               <a class="btn btn-sm btn-outline-dark me-1" [routerLink]="['/cards', card.cardId, 'transactions']">Statement</a>
               <a class="btn btn-sm btn-outline-success me-1" [routerLink]="['/cards', card.cardId, 'rewards']">Rewards</a>
               <a class="btn btn-sm btn-outline-primary me-1" [routerLink]="['/cards', card.cardId, 'emi']">EMI</a>
+              <a class="btn btn-sm btn-outline-secondary me-1" [routerLink]="['/cards', card.cardId, 'controls']">Controls</a>
               <button class="btn btn-sm btn-outline-primary me-1" (click)="editLimit(card)">Change limit</button>
               @if (card.cardStatus === 'Active') {
                 <button class="btn btn-sm btn-outline-danger" (click)="block(card)">Block</button>

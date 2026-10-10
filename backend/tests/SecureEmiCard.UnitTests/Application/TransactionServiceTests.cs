@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using SecureEmiCard.Application.Features.CardControls;
 using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Abstractions.Security;
 using SecureEmiCard.Application.Common.Exceptions;
@@ -55,6 +56,7 @@ public class TransactionServiceTests
             new CreditCardRepository(_db), new TransactionRepository(_db),
             new CashbackRepository(_db), new CashbackEngine(Options.Create(new CashbackOptions())), new EmiPlanRepository(_db), _db,
             lookup, hasher, _user,
+            new CardControlRules(Options.Create(new CardControlOptions())),
             new SwipeRequestValidator(), new LoadRequestValidator());
     }
 

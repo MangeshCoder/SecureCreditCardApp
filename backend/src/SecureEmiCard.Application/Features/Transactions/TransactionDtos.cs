@@ -1,10 +1,13 @@
 using SecureEmiCard.Application.Features.Cards;
+using SecureEmiCard.Domain.Enums;
 
 namespace SecureEmiCard.Application.Features.Transactions;
 
 /// <summary>
 /// What a merchant POS terminal / payment page sends to authorize a purchase.
 /// Card-present (PIN) and card-not-present (expiry + CVV) data are both required in this simulator.
+/// Module 6: Channel and MerchantCountry say how and where the card is used. They are optional, so
+/// older clients keep working: missing means a chip + PIN purchase at a shop in the home country.
 /// </summary>
 public record SwipeRequest(
     string CardNumber,
@@ -14,7 +17,9 @@ public record SwipeRequest(
     string Pin,
     string MerchantName,
     string MerchantCategoryCode,
-    decimal Amount);
+    decimal Amount,
+    TransactionChannel Channel = TransactionChannel.Pos,
+    string? MerchantCountry = null);
 
 /// <summary>Result of an authorization. A decline is a normal business outcome, so it is HTTP 200, not an error.</summary>
 public record SwipeResponse(
@@ -44,6 +49,9 @@ public record TransactionDto(
     string? DeclineReason,
     bool IsEmiConverted,
     DateTime TransactionDate,
+    string? Channel,
+    string? MerchantCountry,
+    bool IsInternational,
     decimal? CashbackEarned = null,
     bool CashbackReversed = false);
 

@@ -26,6 +26,11 @@ export const routes: Routes = [
       import('./features/transactions/card-transactions/card-transactions').then(m => m.CardTransactions)
   },
   {
+    path: 'cards/:cardId/controls',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/cards/card-controls/card-controls').then(m => m.CardControls)
+  },
+  {
     path: 'cards/:cardId/rewards',
     canActivate: [authGuard],
     loadComponent: () => import('./features/cashback/card-rewards/card-rewards').then(m => m.CardRewards)

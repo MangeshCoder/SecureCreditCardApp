@@ -14,6 +14,11 @@ body {
   background: linear-gradient(135deg, #6c757d, #495057);
 }
 
+/* Module 6: temporarily locked by the cardholder */
+.credit-card.locked {
+  background: linear-gradient(135deg, #7a5c12, #a87f1a);
+}
+
 .card-number {
   font-family: 'Courier New', monospace;
   font-size: 1.3rem;

@@ -21,6 +21,10 @@ namespace SecureEmiCard.Domain.Common
         public const string CreditLimitChanged = "CreditLimitChanged";
         public const string PinChanged = "PinChanged";
         public const string CardNumberRevealed = "CardNumberRevealed";
+        // Card controls (Module 6)
+        public const string CardLocked = "CardLocked";
+        public const string CardUnlocked = "CardUnlocked";
+        public const string CardControlsChanged = "CardControlsChanged";
 
         // Customers
         public const string CardholderActivated = "CardholderActivated";
@@ -33,7 +37,8 @@ namespace SecureEmiCard.Domain.Common
         public static readonly IReadOnlyList<string> All = new[]
         {
             GatewayAuthorize, Login, Register, CardIssued, CardBlocked, CardUnblocked, CreditLimitChanged,
-            PinChanged, CardNumberRevealed, CardholderActivated, CardholderDeactivated, Refund, EmiConversion
+            PinChanged, CardNumberRevealed, CardLocked, CardUnlocked, CardControlsChanged,
+            CardholderActivated, CardholderDeactivated, Refund, EmiConversion
         };
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SecureEmiCard.Application.Abstractions.Persistence;
 using SecureEmiCard.Application.Abstractions.Security;
+using SecureEmiCard.Application.Features.CardControls;
 using SecureEmiCard.Application.Features.Cashback;
 using SecureEmiCard.Application.Features.Emi;
 using SecureEmiCard.Domain.Entities;
@@ -56,6 +57,16 @@ public static class DependencyInjection
             .Validate(o => o.AnnualInterestRates.Count > 0 && o.AnnualInterestRates.Keys.All(t => EmiPlan.AllowedTenures.Contains(t)),
                       "Emi:AnnualInterestRates keys must be tenures from: 3, 6, 12, 24.")
             .Validate(o => o.AnnualInterestRates.Values.All(r => r is >= 0 and <= 60), "Emi:AnnualInterestRates must be between 0 and 60.")
+            .ValidateOnStart();
+
+        // ---- Card controls (Module 6) ----------------------------------------------------------
+        services.AddOptions<CardControlOptions>()
+            .Bind(configuration.GetSection(CardControlOptions.SectionName))
+            .Validate(o => o.HomeCountryCode is { Length: 2 } && o.HomeCountryCode.All(char.IsAsciiLetterUpper),
+                      "CardControls:HomeCountryCode must be a 2-letter upper-case ISO code, e.g. IN.")
+            .Validate(o => o.ContactlessPerTransactionLimit > 0, "CardControls:ContactlessPerTransactionLimit must be > 0.")
+            .Validate(o => o.BusinessDayUtcOffset >= TimeSpan.FromHours(-12) && o.BusinessDayUtcOffset <= TimeSpan.FromHours(14),
+                      "CardControls:BusinessDayUtcOffset must be between -12:00 and +14:00.")
             .ValidateOnStart();
 
         // ---- Security --------------------------------------------------------------

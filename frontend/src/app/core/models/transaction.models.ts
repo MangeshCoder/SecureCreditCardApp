@@ -2,6 +2,8 @@ import { Card } from './card.models';
 
 export type TransactionType = 'Swipe' | 'Load' | 'Refund' | 'EmiInstallment';
 export type TransactionStatus = 'Completed' | 'Declined' | 'Refunded';
+/** Module 6: how the card was used. */
+export type TransactionChannel = 'Pos' | 'Online' | 'Contactless' | 'Atm';
 
 export interface SwipeRequest {
   cardNumber: string;
@@ -12,6 +14,9 @@ export interface SwipeRequest {
   merchantName: string;
   merchantCategoryCode: string;
   amount: number;
+  /** Module 6 - optional: the API assumes 'Pos' in the home country when missing. */
+  channel?: TransactionChannel;
+  merchantCountry?: string;
 }
 
 /** A decline is a normal result (HTTP 200) - check `approved`. */
@@ -41,6 +46,10 @@ export interface Transaction {
   declineReason: string | null;
   isEmiConverted: boolean;
   transactionDate: string;
+  /** Module 6: null for repayments and EMI installments. */
+  channel: TransactionChannel | null;
+  merchantCountry: string | null;
+  isInternational: boolean;
   /** Module 3: cashback earned by this swipe, if any. */
   cashbackEarned: number | null;
   cashbackReversed: boolean;

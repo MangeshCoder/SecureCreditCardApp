@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { Card } from '../../../core/models/card.models';
+import { CardControlsService } from '../../../core/services/card-controls.service';
 import { CardService } from '../../../core/services/card.service';
 import { apiErrorMessages } from '../../../core/utils/api-error';
 
@@ -18,6 +19,7 @@ const PIN = [Validators.required, Validators.pattern(/^\d{4}$/)];
 })
 export class MyCards implements OnInit, OnDestroy {
   private readonly cardService = inject(CardService);
+  private readonly controlsService = inject(CardControlsService);
   private readonly fb = inject(FormBuilder).nonNullable;
   private hideTimer?: ReturnType<typeof setTimeout>;
 
@@ -73,6 +75,23 @@ export class MyCards implements OnInit, OnDestroy {
       next: updated => {
         this.replace(updated);
         this.message.set(`Card ${updated.maskedCardNumber} has been blocked.`);
+      },
+      error: e => this.errors.set(apiErrorMessages(e))
+    });
+  }
+
+  /** Module 6: temporary lock - the cardholder can undo it, unlike Block. */
+  toggleLock(card: Card): void {
+    this.errors.set([]);
+    const request = card.isLocked
+      ? this.controlsService.unlock(card.cardId)
+      : this.controlsService.lock(card.cardId);
+    request.subscribe({
+      next: updated => {
+        this.replace(updated);
+        this.message.set(updated.isLocked
+          ? `Card ${updated.maskedCardNumber} is locked. Purchases are declined until you unlock it.`
+          : `Card ${updated.maskedCardNumber} is unlocked.`);
       },
       error: e => this.errors.set(apiErrorMessages(e))
     });

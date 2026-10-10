@@ -8,6 +8,7 @@
 //   dotnet run --project tools/PartnerBankSimulator -- --card 4581230000000000 --expiry 10/31 --cvv 123 --pin 2580 --amount 1500
 // Options:
 //   --merchant "Amazon India"   --mcc 5732
+//   --channel Pos | Online | Contactless | Atm   --country IN      (Module 6: card controls)
 //   --attack tamper | replay | stale | wrong-key     (shows how each attack is rejected)
 // =====================================================================================
 using System.Net.Http.Headers;
@@ -33,7 +34,9 @@ var swipe = new
     pin = Arg("pin"),
     merchantName = Arg("merchant", "Partner Bank Merchant"),
     merchantCategoryCode = Arg("mcc", "5999"),
-    amount = decimal.Parse(Arg("amount"))
+    amount = decimal.Parse(Arg("amount")),
+    channel = Arg("channel", "Pos"),
+    merchantCountry = Arg("country", "IN")
 };
 var attack = Arg("attack", "none");
 
